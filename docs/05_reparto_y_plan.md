@@ -1,8 +1,8 @@
 # 05 · Reparto y plan (sábado 7/11 12:30 → domingo 8/11 08:00)
 
-## Reparto (3 personas)
+## Reparto (4 personas)
 Cada persona es dueña de sus módulos. Para tocar los de otra persona, se avisa antes.
-Los nombres se rellenan cuando se repartan los roles.
+B y D: Izan y Marc (decidid quién es quién y poned el nombre aquí, en `CLAUDE.md` y en `docs/10`).
 
 ### Persona A: Datos y política (Lluis)
 Es la base de todo y lo que más bloquea a los demás, así que va primero.
@@ -13,12 +13,19 @@ Es la base de todo y lo que más bloquea a los demás, así que va primero.
 - **Entregable temprano (≤ 15:30):** `build_context()` funcionando sobre las 150 alertas y un fichero
   `output/contexts_sample.jsonl` para que B y C trabajen con datos reales.
 
-### Persona B: Agente IA y correlación
+### Persona B: Agente IA
 - `soc/triage/agent.py` y `prompts/`: prompt del triaje, salida JSON con el esquema del ticket, defensa contra inyección (ver [07](07_llm.md)).
 - `soc/triage/reviewer.py`: revisor crítico. Comprueba que cada afirmación esté respaldada por un `event_id` del contexto.
-- `soc/correlate/incidents.py`: agrupación de alertas en incidentes y cadena de ataque (niveles 2 y 3).
-- `eval/`: etiquetar a mano unas 40 alertas de la muestra y medir el acierto.
+- Paralelismo, fallback y caché de las llamadas LLM (modo en vivo).
+- `eval/evaluate.py`: medir el acierto con las etiquetas de D y afinar prompts. Casos de prompt injection.
 - **Mientras A termina el contexto:** trabajar con 3-5 alertas reales construyendo el contexto a mano, o con stubs.
+
+### Persona D: Threat hunting, correlación e investigación
+- **Threat hunting manual** de los incidentes escondidos → `eval/incidents_truth.jsonl` (nuestra verdad para evaluar y para la demo).
+- `eval/labels_dev.jsonl`: etiquetar a mano unas 40 alertas de la muestra.
+- `soc/correlate/incidents.py`: agrupación de alertas en incidentes y cadena de ataque (nivel 2).
+- `soc/correlate/investigate.py`: informe de investigación de nivel 3.
+- "Lo que no resolvemos" con datos reales.
 
 ### Persona C: Dashboard, contención y presentación (Adrián)
 - `dashboard/app.py` (Streamlit): cola de alertas con filtros, detalle del ticket, **traza de consultas**, evidencias,
@@ -29,19 +36,19 @@ Es la base de todo y lo que más bloquea a los demás, así que va primero.
 - **Mientras no hay datos reales:** construir el dashboard contra un `output/tickets.jsonl` de ejemplo con el contrato de [04](04_arquitectura.md).
 
 ## Plan horario
-| Hora | A (datos/política) | B (IA/correlación) | C (dashboard/pitch) |
-|---|---|---|---|
-| 12:30-13:30 | Setup, lectura de docs, DataStore | Setup, leer runbooks, prompt v0 | Setup, esqueleto de Streamlit con tickets de ejemplo |
-| 13:30-15:30 | Índices + `build_context` | `agent.py` con un contexto hecho a mano | Vista de cola y detalle + traza |
-| **15:30** | **🔗 Integración 1:** contexto real → agente → ticket → dashboard (5 alertas) | | |
-| 15:30-19:00 | `severity` + `rules` + prefiltro | Afinar el prompt por runbook, revisor, etiquetar la muestra | Aprobación y contención en la API, métricas |
-| **19:00** | **🔗 Integración 2:** pipeline completo sobre las 150 alertas | | |
-| 19:00-20:00 | Cena + revisión conjunta de errores del triaje | | |
-| 20:00-00:00 | Prefiltro sobre las 11.061 sin LLM, rendimiento | Correlación en incidentes | Vista de incidentes y de la cadena de ataque |
-| 00:00-03:00 | Corregir errores detectados en la evaluación | Investigación nivel 3 de los incidentes escalados | Slides y one-pager |
-| **03:00** | **🧊 Congelar funcionalidades.** Solo se corrigen bugs a partir de aquí. | | |
-| 03:00-06:00 | Pruebas con alertas no vistas (simular las 10 de la defensa) | Evaluación final y "lo que no resolvemos" | Ensayo de la demo |
-| 06:00-08:00 | README final, limpieza | | Ensayo completo y vídeo de respaldo de la demo |
+| Hora | A (datos/política) | B (agente IA) | D (hunting/correlación) | C (dashboard/pitch) |
+|---|---|---|---|---|
+| 12:30-13:30 | Setup, lectura de docs, DataStore | Setup, leer runbooks, prompt v0 | Setup, threat hunting | Setup, esqueleto de Streamlit con tickets de ejemplo |
+| 13:30-15:30 | Índices + `build_context` | `agent.py` con un contexto hecho a mano | Threat hunting → `incidents_truth.jsonl` (15:00) | Vista de cola y detalle + traza |
+| **15:30** | **🔗 Integración 1:** contexto real → agente → ticket → dashboard (5 alertas) | | | |
+| 15:30-19:00 | `severity` + `rules` + prefiltro | Revisor, paralelismo, robustez | Etiquetas de evaluación, inicio de la correlación | Aprobación y contención en la API, métricas |
+| **19:00** | **🔗 Integración 2:** pipeline completo sobre las 150 alertas | | | |
+| 19:00-20:00 | Cena + revisión conjunta de errores del triaje | | | |
+| 20:00-00:00 | Prefiltro sobre las 11.061 sin LLM, rendimiento | Evaluación y afinado, prompt injection | Correlación en incidentes | Vista de incidentes y de la cadena de ataque |
+| 00:00-03:00 | Corregir errores detectados en la evaluación | Bucle de calidad con simulacros | Investigación nivel 3 | Slides y one-pager |
+| **03:00** | **🧊 Congelar funcionalidades.** Solo se corrigen bugs a partir de aquí. | | | |
+| 03:00-06:00 | Pruebas con alertas no vistas (simular las 10 de la defensa) | Evaluación final | "Lo que no resolvemos" y caso estrella de la demo | Ensayo de la demo |
+| 06:00-08:00 | README final, limpieza | | | Ensayo completo y vídeo de respaldo de la demo |
 
 **Regla de oro:** a las 15:30 y a las 19:00 tiene que haber algo funcionando de punta a punta, aunque sea feo.
 Un nivel 1 sólido gana a un nivel 4 roto.

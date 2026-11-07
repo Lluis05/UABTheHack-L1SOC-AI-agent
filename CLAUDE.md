@@ -1,7 +1,7 @@
 # CLAUDE.md — Instrucciones para cualquier Claude que trabaje en este repo
 
 Proyecto: **L1 SOC AI Agent** para el reto de Deloitte en UAB The Hack 2026.
-Equipo de 3 personas, cada una con su propio Claude. **Entrega: domingo 8 de noviembre de 2026 a las 08:00.**
+Equipo de 4 personas, cada una con su propio Claude. **Entrega: domingo 8 de noviembre de 2026 a las 08:00.**
 
 ## Antes de hacer nada, lee
 1. `docs/00_INDICE.md` — mapa de toda la documentación.
@@ -12,7 +12,7 @@ Equipo de 3 personas, cada una con su propio Claude. **Entrega: domingo 8 de nov
 ## Reglas obligatorias
 - **Commits:** autor = la persona humana. **NUNCA** añadas `Co-Authored-By: Claude` ni "Generated with Claude Code"
   en commits ni en PRs. Solo deben aparecer los usuarios del equipo.
-- **Ramas:** cada persona trabaja en su rama (`feat/data` Lluis, `feat/agent` Persona B, `feat/dashboard` Adrián),
+- **Ramas:** cada persona trabaja en su rama (`feat/data` Lluis · A, `feat/agent` Persona B, `feat/correlate` Persona D, `feat/dashboard` Adrián · C),
   nunca directamente en `main`. **Siempre `git pull` antes de empezar y antes de subir nada.** Los conflictos se
   resuelven en tu rama (`git rebase main`), nunca en `main`; el merge a `main` es `--ff-only`. Nunca `push --force`
   a `main`. Flujo completo en `docs/06_setup_y_convenciones.md` → "Flujo obligatorio".

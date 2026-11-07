@@ -62,13 +62,15 @@ soc/
     reviewer.py          # segundo pase crítico (Persona B)
     prompts/             # prompts versionados .md (Persona B)
   correlate/
-    incidents.py         # agrupación en incidentes (Persona B)
+    incidents.py         # agrupación en incidentes (Persona D)
+    investigate.py       # informe nivel 3 (Persona D)
   pipeline.py            # orquesta 1→6, CLI (Persona A)
 dashboard/
   app.py                 # Streamlit (Persona C)
   containment.py         # cliente de la API simulada (Persona C)
 eval/
-  labels_dev.jsonl       # etiquetas manuales de la muestra (todos)
+  labels_dev.jsonl       # etiquetas manuales de la muestra (Persona D)
+  incidents_truth.jsonl  # incidentes encontrados con threat hunting (Persona D)
   evaluate.py            # métricas (Persona B)
 docs/                    # esta documentación
 output/                  # (gitignored) resultados de ejecución

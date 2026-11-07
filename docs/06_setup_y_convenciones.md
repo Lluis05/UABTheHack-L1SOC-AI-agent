@@ -36,12 +36,13 @@ Cuidado: la API simulada carga las 11.061 alertas al arrancar y carga cada log e
 - Antes de hacer push: `git pull --rebase origin main`.
 - **Nunca** `git push --force` a `main`.
 
-### Flujo obligatorio (los 3, y sus Claudes)
+### Flujo obligatorio (los 4, y sus Claudes)
 **1. Cada persona tiene su propia rama.** Nadie hace commits directamente en `main`.
 | Persona | Rama |
 |---|---|
 | A · Lluis (datos y política) | `feat/data` |
-| B (IA y correlación) | `feat/agent` |
+| B (agente IA) | `feat/agent` |
+| D (threat hunting, correlación e investigación) | `feat/correlate` |
 | C · Adrián (dashboard, contención y pitch) | `feat/dashboard` |
 
 Si hace falta una rama extra (p. ej. `feat/pitch`), se crea a partir de `main` actualizado.

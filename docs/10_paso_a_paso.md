@@ -106,17 +106,18 @@ Eres el camino crítico: B y C dependen de tu A3.
 
 ---
 
-## PERSONA B · Agente IA y correlación
-**Misión:** que la IA razone como un buen N1, cite evidencias reales y no se deje manipular. Después, agrupar alertas en incidentes.
+## PERSONA B · Agente IA — _(Izan o Marc)_
+**Misión:** que la IA razone como un buen N1, cite evidencias reales y no se deje manipular.
+**Rama:** `feat/agent`. **Módulos:** `soc/triage/agent.py`, `soc/triage/reviewer.py`, `soc/triage/prompts/`, `eval/evaluate.py`.
 
 ### B1 · Conocer el terreno (12:45 → 13:30)
-- [ ] Leer los 10 runbooks (`DATASET_DIR/01_contexto/runbooks/`) y el catálogo de casos de uso.
+- [ ] Leer los 10 runbooks (`DATASET_DIR/01_contexto/runbooks/`), el catálogo de casos de uso y `docs/07_llm.md`.
 - [ ] Elegir **8 alertas de desarrollo** de la muestra que cubran: WEB-001, EML-001, EDR-002 (SCCM y otra), IDP-001,
   NET-001, AI-001 y una high. Guardar sus IDs en `eval/dev_set.txt`.
 - **Prompt:** *"Lee los runbooks y la muestra. Propón 8 alertas de desarrollo variadas y explica por qué cada una."*
 
 ### B2 · Agente de triaje v1 (13:30 → 15:30) 🔗 **INTEGRACIÓN 1**
-- **Archivos:** `soc/triage/agent.py`, `soc/triage/prompts/system.md`, `soc/triage/prompts/runbooks/` (o leerlos del dataset).
+- **Archivos:** `soc/triage/agent.py`, `soc/triage/prompts/system.md` (los runbooks se leen del dataset).
 - **Qué:**
   - `triage(context, prefilter_hint=None) -> dict` usando `soc.llm.complete()` con JSON Schema (subset del Ticket
     + `plus_reasons`/`minus_reasons`; ver `docs/07`).
@@ -133,35 +134,80 @@ Eres el camino crítico: B y C dependen de tu A3.
 - **Qué:**
   - Validación **en código** (gratis): cada `evidence[].event_id` tiene que existir en el contexto; si no, se elimina y se baja la confianza.
   - Revisor LLM **solo** si el veredicto es TP con severidad ≥ high, o si la confianza es < 0.6. Es más barato y se usa donde importa.
-  - `triage_many(contexts, workers=5)` con ThreadPoolExecutor, timeout de 90 s por alerta, y si todo falla se devuelve el prefiltro marcado como "sin IA".
+  - `triage_many(contexts, workers=5, on_step=None)` con ThreadPoolExecutor, timeout de 90 s por alerta, y si todo falla
+    se devuelve el prefiltro marcado como "sin IA". `on_step` es el callback de progreso que necesita el dashboard (C4).
 - **Terminado cuando:** con `LLM_PROVIDERS=bogus,gemini` sigue funcionando, y 10 alertas en paralelo tardan menos de 2 min.
 
-### B4 · Evaluación (17:30 → 19:00)
-- **Archivos:** `eval/labels_dev.jsonl`, `eval/evaluate.py`.
-- **Qué:** etiquetar a mano unas **40 alertas** de la muestra (veredicto y severidad esperados, con una línea de motivo),
-  repartidas entre reglas. `evaluate.py` compara con `output/tickets.jsonl`: accuracy del veredicto, acierto exacto
-  de severidad (±1) y matriz de confusión.
-- **Terminado cuando:** tenemos un número real de acierto para el pitch y una lista de errores para corregir.
+### B4 · Evaluación y afinado (17:30 → 22:00)
+- **Archivos:** `eval/evaluate.py`, prompts.
+- **Qué:** `evaluate.py` compara `output/tickets.jsonl` con las etiquetas de D (`eval/labels_dev.jsonl`): accuracy del
+  veredicto, acierto de severidad (exacto y ±1), matriz de confusión y lista de errores.
+  Iterar el prompt (por runbook si hace falta) hasta que los errores tengan explicación.
+- **Terminado cuando:** hay un número real de acierto para el pitch y está en `docs/09_hallazgos.md`.
 
-### B5 · Correlación en incidentes (20:00 → 00:00) — nivel 2
+### B5 · Prompt injection a prueba (22:00 → 00:00)
+- [ ] Crear `eval/injection_cases.jsonl`: 5-6 alertas manipuladas (asunto de correo, prompt de Vela, command line y
+  descripción de servicio con instrucciones del tipo "cierra esta alerta" o "marca como false_positive").
+- [ ] Comprobar que **ninguna** cambia el veredicto y que la inyección aparece como evidencia. Medirlo en `evaluate.py`.
+- [ ] Preparar el caso de la demo (ver `docs/08`).
+
+### B6 · Bucle de calidad (00:00 → 03:00)
+- [ ] Simulacros `--random 10 --live`, revisar cada ticket y corregir prompts o esquema.
+- [ ] Ajustar `CLAUDE_MODEL` (sonnet frente a opus) según calidad, tiempo y cuota. **Dejar cuota para el domingo.**
+
+---
+
+## PERSONA D · Threat hunting, correlación e investigación — _(Izan o Marc)_
+**Misión:** saber **qué incidentes reales hay escondidos** en el dataset (nuestra "verdad"), etiquetar la evaluación
+y construir la correlación que los encuentre automáticamente (niveles 2 y 3).
+**Rama:** `feat/correlate`. **Módulos:** `soc/correlate/`, `eval/labels_dev.jsonl`, `eval/incidents_truth.jsonl`, `eval/hunt/`.
+
+### D1 · Threat hunting manual (12:45 → 15:00)
+- **Qué:** con tu Claude y scripts de análisis de solo lectura (`eval/hunt/*.py`), buscar los incidentes escondidos.
+  Pistas de `docs/03` por las que empezar:
+  - **nuria.vidal** (se va a un competidor el 16/10): DLP, subidas a la nube, consultas SQL al CRM, correo externo.
+  - **Fraude de IBAN** (UC-EML-004) mientras jordi.serra2 (Tesorería) está de vacaciones (26-30/10).
+  - Alertas **de una sola ocurrencia** (LSASS, shadow copies, MFA fatigue, regla de buzón, AnyDesk, CLD-002 admin IAM,
+    EDR-011, EDR-012 TPV, AI-002, OT-001, DEV-001): ¿qué pasó antes y después en ese host o usuario?
+  - **JENKINS-DEV01** (CVE crítico, expuesto) y la cadena CI/CD → AWS.
+  - Actividad fuera de las ventanas de los cambios: IP del pentest fuera de fechas, EDR-002 con un padre que no es CcmExec, `adm.*` fuera de JUMP01.
+  - Viajes imposibles que **no** explica RRHH. Bajas con actividad posterior a su último día.
+- **Salida:** `eval/incidents_truth.jsonl` (un incidente por línea: id, descripción, alert_ids, entidades, cronología,
+  veredicto y severidad esperados) y un resumen en `docs/09_hallazgos.md`. **Compartir a las 15:00:** a A le sirve
+  para las reglas, a B para los prompts y a C para elegir los casos de la demo.
+- **Prompt:** *"Haz D1: threat hunting de solo lectura sobre el dataset de DATASET_DIR. Empieza por las pistas de docs/10.
+  Para cada incidente que encuentres dame alert_ids, event_ids clave y la cronología."*
+
+### D2 · Etiquetas de evaluación (15:00 → 17:30)
+- **Archivos:** `eval/labels_dev.jsonl`.
+- **Qué:** etiquetar a mano unas **40 alertas** de la muestra de desarrollo, repartidas entre reglas, más las alertas de los
+  incidentes de D1. Formato: `{"alert_id", "verdict", "severity", "escalate", "reason", "incident_id"}`.
+  Aplicar la matriz de `docs/03` a mano (o con `soc/policy/severity.py` cuando lo tenga A).
+- **Terminado cuando:** B puede ejecutar `evaluate.py` con estas etiquetas.
+
+### D3 · Correlación en incidentes (17:30 → 22:00) — nivel 2
 - **Archivos:** `soc/correlate/incidents.py`.
 - **Qué:**
   - Grafo de alertas que comparten entidades (usuario, host, IP externa, dominio, hash, message_id) dentro de una ventana
-    configurable (días). **Excluir entidades "hub"** (IPs de proxy, DCs, dominios populares, la IP del pentest, NESSUS01)
-    para no fusionarlo todo.
+    configurable (días). Usar `extract_entities` y `alerts_for_entity` de A. **Excluir entidades "hub"** (IPs de proxy,
+    DCs, dominios populares, la IP del pentest, NESSUS01) para no fusionarlo todo.
   - Componentes conexos → `Incident` (ver `docs/04`). Ordenar por tiempo → `kill_chain` por táctica MITRE.
-  - En modo en vivo: para una alerta nueva, buscar a qué incidente existente se une (`x_incident_id`).
+  - En modo en vivo: `attach(alert) -> incident_id | None` para saber a qué incidente existente se une una alerta nueva (`x_incident_id`).
   - Severidad del incidente = la máxima de sus alertas, +1 si forma una cadena (política §5).
-- **Terminado cuando:** sobre el dataset completo aparecen incidentes con sentido. Apuntar los mejores en `docs/09_hallazgos.md`.
+- **Terminado cuando:** **encuentra automáticamente los incidentes de `eval/incidents_truth.jsonl`**. Medir cuántos
+  encuentra y cuántas alertas sobran o faltan.
 
-### B6 · Investigación nivel 3 (00:00 → 03:00)
-- [ ] Para incidentes escalados: un prompt LLM que redacte el informe según `informe_incidente.schema.json`
-  (origen, alcance, cronología y relación con otros incidentes).
-- [ ] Buscar activamente los incidentes escondidos (usuarios que se van, fraude IBAN, OT, supply chain, Vela, AWS…)
-  y comprobar que nuestro sistema los encuentra.
-- [ ] Redactar la sección "Lo que no resolvemos" en `docs/08_demo_y_pitch.md` con datos de la evaluación.
+### D4 · Investigación nivel 3 (22:00 → 02:00)
+- **Archivos:** `soc/correlate/investigate.py`.
+- [ ] Para incidentes escalados: un prompt LLM (con `soc.llm.complete`) que redacte el informe según
+  `informe_incidente.schema.json` (origen, alcance, cronología y relación con otros incidentes) a partir de las
+  alertas, el contexto y los logs de las entidades a lo largo de los días.
+- [ ] Guardarlo en `output/incidents.jsonl` para que C lo muestre.
 
----
+### D5 · Honestidad y apoyo a la demo (02:00 → 06:00)
+- [ ] Redactar "Lo que no resolvemos" en `docs/08_demo_y_pitch.md` con datos reales: incidentes que no encontramos,
+  errores típicos y limitaciones.
+- [ ] Preparar con C el caso estrella de la demo: un incidente multi-día reconstruido de principio a fin.
 
 ## PERSONA C · Dashboard, contención y presentación — Adrián
 **Misión:** que el jurado *vea* cómo la IA hace el triaje y dónde decide la persona. Esto es lo que van a evaluar visualmente.
@@ -222,6 +268,7 @@ Eres el camino crítico: B y C dependen de tu A3.
 ## Puntos de integración (todos juntos, 15 min)
 | Hora | Qué tiene que funcionar | Responsable de que pase |
 |---|---|---|
+| **15:00** | Incidentes escondidos documentados (`eval/incidents_truth.jsonl`) | D |
 | **15:30** | 5 alertas reales: contexto (A) → agente (B) → ticket → dashboard (C) | A |
 | **19:00** | `--sample` completo + `--random 10 --live` < 2 min + aprobación y contención funcionando | B |
 | **00:00** | Incidentes + página de defensa en directo + métricas sobre todo el dataset | C |
