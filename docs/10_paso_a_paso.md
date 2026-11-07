@@ -64,7 +64,7 @@ Eres el camino crítico: B y C dependen de tu A3.
 - **Terminado cuando:** las 150 alertas generan contexto en menos de 1 s cada una y sin errores. Avisar a B y C.
 - **Prompt:** *"Implementa A3. Genera output/contexts_sample.jsonl y mide p50 y p95 de tiempo por alerta."*
 
-### A4 · Motor de política (15:30 → 17:30)
+### A4 · Motor de política (15:30 → 17:30) ✅ HECHO (14:00)
 - **Archivos:** `soc/policy/severity.py`, `soc/policy/rules.py`.
 - **Qué:**
   - `severity.py`: matriz exacta de `docs/03`, ajustes ±1 (como máximo uno en total), regla de benign authorized →

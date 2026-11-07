@@ -149,21 +149,47 @@ Notas:
 - **Hook de política:** `build_context` llama a `soc.policy.evaluate_policy(ctx, store) -> (policy_hits, severity)`
   si existe (A4).
 
+### Política ✅ IMPLEMENTADO (`soc/policy/`)
+`build_context` ya la ejecuta: `ctx["policy_hits"]` y `ctx["severity"]` llegan rellenos.
+```python
+from soc.policy import evaluate_policy, suggest_verdict
+hits, sev = evaluate_policy(ctx, store, extra_plus=["ejecución confirmada"], extra_minus=[])  # recalcular con lo que propone el LLM
+from soc.policy.approvals import approval_for
+approval_for("isolate_host", "WS-BCN-1770", store)  # → requires_approval, approvers, allowed, note
+```
+
 ### PolicyHit — `soc/policy/rules.py`
 ```json
 {"rule": "SCCM_INVENTORY", "effect": "benign|suspicious|malicious|context",
- "detail": "PowerShell codificado lanzado por CcmExec.exe dentro de CHG-2026-1031 (08-10h local)",
- "reference": "CHG-2026-1031"}
+ "detail": "PowerShell codificado lanzado por CcmExec.exe ... dentro de la ventana 08-10 h ...",
+ "reference": "CHG-2026-1031",
+ "verdict_hint": "false_positive|benign_true_positive|true_positive",   // opcional
+ "plus": "motivo de +1",                                                  // opcional
+ "minus": "motivo de −1"}                                                 // opcional
 ```
+Reglas implementadas (unas 50): cambios aprobados (pentest, Nessus, SCCM, PsExec, OT, Logisoft, Backup Operators,
+actualización EDR, nóminas), reglas internas (adm.* fuera de JUMP01, AnyDesk, svc_backup, OT, dependency confusion),
+RRHH (bajas, actividad tras la baja, viajes), inteligencia (TIP, Tor/hosting, desconocido ≠ limpio, sandbox),
+patrones conocidos de FP/TP por regla del SIEM y **PROMPT_INJECTION_TEXT**.
+
 ### SeverityResult — `soc/policy/severity.py`
 ```json
-{"rule_severity":"medium","max_criticality":"Alta","criticality_source":"WS-BCN-1174",
- "base":"medium","adjustment":0,"adjustment_reasons":[],"final":"medium",
- "rationale":"Regla medium × activo Alta = medium; sin ajustes."}
+{"rule_severity":"low","max_criticality":"Crítica","criticality_source":"WEB-ECOM01",
+ "base":"medium","adjustment":-1,"plus_reasons":[],"minus_reasons":["bloqueado por el WAF antes de producir efecto"],
+ "authorized":false,"false_positive":false,"final":"low",
+ "rationale":"Regla low × activo Crítica (WEB-ECOM01) = medium; −1 por bloqueado por el WAF ... → low.",
+ "suggestion": {"verdict":"true_positive","decisive":true,"confidence":0.85,"because":["WAF_BLOCKED"]}}
 ```
-`compute_severity(rule_sev, max_crit, plus_reasons: list[str], minus_reasons: list[str], authorized: bool)`.
-El agente LLM puede proponer `plus_reasons` y `minus_reasons` (p. ej., "ejecución confirmada"), pero la severidad final
-la recalcula siempre esta función.
+- `suggestion.decisive = true` → la política tiene una explicación inequívoca y nada en contra. Así se decide el **87 %** del
+  dataset. En modo en vivo el LLM la recibe como *hint* y puede discrepar.
+- `compute_severity(rule_sev, max_crit, plus, minus, authorized, criticality_source, false_positive)`: ajuste total ±1.
+  Si es autorizado → informational/low; si es FP → informational.
+- Criticidad de la identidad: admin → Crítica, service → Alta, VIP o privilegiado → Alta, resto → Media. Activo desconocido → Media.
+
+### Aprobaciones — `soc/policy/approvals.py`
+`approval_for(action, target, store)` → `{"allowed", "requires_approval", "approvers": ["N2", ...], "note"}`.
+`block_ioc` y `purge_email` no requieren aprobación (salvo servicios de uso dual). Los servidores necesitan N2 + responsable del
+servicio, y los TPV o frontales N2 + Negocio. Sobre OT `allowed=false`.
 
 ### Ticket — salida de triaje (`output/tickets.jsonl`, una línea por ticket)
 El esquema de Deloitte (`ticket_salida.schema.json`) **más** campos propios con prefijo `x_`:
