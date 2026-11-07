@@ -15,6 +15,10 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
 | 15:00 | Lluis | 7 | 95 s, **sin caché** | 9/10 con IA, 1 ticket sin IA | Claude CLI devolvió `is_error` sin detalle y Gemini sin clave → añadido 1 reintento en `soc/llm.py` |
 | 15:10 | Lluis | 21 | **56 s, sin caché** | 10/10 con IA, 0 fallos | 7 TP (WAF bloqueado, scam sin clic), 3 FP (DocuSign, SCCM, viaje imposible falso) |
 
+## Organización: leer las alertas de la API (Discord, 15:50)
+- Pregunta: ¿leer `alertas_muestra_desarrollo.jsonl` o hacer curl a `mock_soc_api`? Respuesta de Deloitte: **"Mejor usar la API"**.
+- Implementado (Lluis): entrada por la API + enriquecimiento híbrido (índice local y la API como respaldo de lo que no conozcamos). Ver docs/04. Si en la defensa la API trae alertas nuevas que no están en nuestro dataset, se triarán igual.
+
 ## Métricas del batch completo (`--all --no-llm`, Lluis 16:00)
 - 11.061 alertas → 10.972 tickets (89 duplicados agrupados) en ~36 s (~300 alertas/s).
 - **86,9 % decididas por la política** sin IA; 5.384 cerradas automáticamente; 1.434 pendientes de IA (220 con severidad potencial high/critical, que se escalan a una persona).

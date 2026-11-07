@@ -9,3 +9,9 @@ def _block_real_llm(monkeypatch):
 
     monkeypatch.setattr("soc.llm.complete", blocked)
     monkeypatch.setattr("soc.triage.agent.complete", blocked)  # agent.py lo importa por nombre
+
+
+@pytest.fixture(autouse=True)
+def _local_by_default(monkeypatch):
+    """Los tests no dependen de que la API del SOC esté levantada (salvo los que montan una falsa)."""
+    monkeypatch.setenv("SOC_API_MODE", "local")

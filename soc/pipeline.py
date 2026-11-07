@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from soc import config
+from soc.data.api import HybridStore, SocApi, SocApiError, get_api
 from soc.data.normalize import normalize_alert
 from soc.data.store import DataStore, get_store
 from soc.enrich.context import build_context
@@ -73,22 +74,49 @@ def load_alert_file(path: str | Path) -> list[dict]:
     return alerts
 
 
+def _tag(a: dict, how: str) -> dict:
+    return {**a, "x_intake": how}
+
+
 def select_alerts(store: DataStore, *, ids: str | None = None, file: str | None = None,
                   random_n: int | None = None, sample: bool = False, all_: bool = False,
-                  seed: int | None = None) -> list[dict]:
+                  queue_n: int | None = None, seed: int | None = None, api: SocApi | None = None) -> list[dict]:
+    """Alertas a triar. --ids/--random/--queue se leen de la API del SOC (lo que pide Deloitte) si está levantada;
+    si no, del dataset local. --sample/--all son lotes de desarrollo y se leen siempre en local."""
+    api_up = bool(api and api.available())
+    if (ids or random_n or queue_n) and api is not None and not api_up:
+        log.warning("API del SOC no disponible en %s: se leen las alertas del dataset local", api.base)
     if ids:
         out = []
         for i in (x.strip() for x in ids.split(",") if x.strip()):
+            a = None
+            if api_up:
+                try:
+                    a = api.alert(i)
+                except SocApiError as e:
+                    log.warning("API: %s", e)
+                if a:
+                    out.append(_tag(a, f"API SOC · GET /alerts/{i}"))
+                    continue
             a = store.alert(i)
             if a is None:
-                log.warning("Alerta %s no está en el dataset: se ignora", i)
+                log.warning("Alerta %s no está ni en la API ni en el dataset: se ignora", i)
             else:
-                out.append(a)
+                out.append(_tag(a, "dataset local"))
         return out
     if file:
-        return load_alert_file(file)
+        return [_tag(a, f"fichero {Path(file).name}") for a in load_alert_file(file)]
+    if queue_n:
+        if api_up:
+            return [_tag(a, "API SOC · GET /alerts?status=new") for a in api.queue("new", limit=queue_n)["items"]]
+        return [_tag(a, "dataset local (cola)") for a in [a for a in store.alerts() if a.get("status") == "new"][:queue_n]]
     if random_n:
-        return random.Random(seed).sample(store.alerts(), random_n)
+        if api_up:
+            try:
+                return [_tag(a, "API SOC · GET /alerts (al azar)") for a in api.random_alerts(random_n, seed=seed)]
+            except SocApiError as e:
+                log.warning("API: %s; se usa el dataset local", e)
+        return [_tag(a, "dataset local (al azar)") for a in random.Random(seed).sample(store.alerts(), random_n)]
     if sample:
         return list(store.alerts(sample=True))
     if all_:
@@ -134,10 +162,19 @@ def _merge_group(ticket: dict, group: list[dict]) -> dict:
 # ------------------------------------------------------------------ núcleo
 def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store: DataStore | None = None,
         on_step: OnStep | None = None, dedup: bool | None = None, use_cache: bool | None = None,
-        save_traces: bool = True) -> list[dict]:
-    """Tría alertas. mode: 'live' (IA en todas) | 'normal' (IA solo si hace falta) | 'no_llm'."""
+        save_traces: bool = True, api: SocApi | None | bool = None) -> list[dict]:
+    """Tría alertas. mode: 'live' (IA en todas) | 'normal' (IA solo si hace falta) | 'no_llm'.
+
+    api: API del SOC como respaldo del enriquecimiento (lo que no esté en local). Por defecto solo en 'live';
+    en los lotes grandes todo es local para no saturar la API."""
     assert mode in ("live", "normal", "no_llm"), mode
     store = store or get_store()
+    if api is None or api is True:
+        api = get_api() if (mode == "live" or api is True) else None
+    hybrid = HybridStore(store, api) if api else None
+    if hybrid and not api.available():
+        log.warning("API del SOC no disponible en %s: enriquecimiento solo local", api.base)
+        hybrid = None
     # Entrada defensiva: alertas nuevas o mal formadas se normalizan (y se anota qué se corrigió)
     alerts = [normalize_alert(a, i) for i, a in enumerate(alerts)]
     lock = threading.Lock()
@@ -160,7 +197,13 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
         aid = a.get("alert_id", "?")
         step(aid, "context", {"message": "recopilando contexto (CMDB, directorio, logs ±24 h, TIP, cambios…)"})
         try:
-            ctx = build_context(a, store)
+            if hybrid:
+                hybrid.begin()
+            ctx = build_context(a, hybrid or store)
+            intake = a.get("x_intake")
+            extra = ([{"step": "intake", "query": aid, "result": f"alerta leída de: {intake}", "ms": 0,
+                       "source": "API SOC" if "API" in intake else "Entrada"}] if intake else [])
+            ctx["trace"] = extra + (ctx.get("trace") or []) + (hybrid.api_calls() if hybrid else [])
         except Exception as e:  # noqa: BLE001 - nunca romper la cola por una alerta
             log.exception("build_context falló para %s", aid)
             ctx = {"alert": a, "entities": {}, "trace": [{"step": "error", "source": "Contexto", "query": aid,
@@ -270,14 +313,15 @@ def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, 
                 on_step: OnStep | None = None, workers: int = 5) -> list[dict]:
     """Punto de entrada del dashboard (contrato docs/04): tría en directo, IA en todas, progreso paso a paso."""
     store = get_store()
-    sel = list(alerts or [])
+    api = get_api()
+    sel = [_tag(a, "dashboard (alerta pegada)") for a in alerts or []]
     for i, a in enumerate(sel):
         a.setdefault("alert_id", f"ALR-NUEVA-{i + 1:04d}")
     if ids:
-        sel += select_alerts(store, ids=",".join(ids))
+        sel += select_alerts(store, ids=",".join(ids), api=api)
     if random:
-        sel += select_alerts(store, random_n=random)
-    tickets = run(sel, mode="live", workers=workers, store=store, on_step=on_step)
+        sel += select_alerts(store, random_n=random, api=api)
+    tickets = run(sel, mode="live", workers=workers, store=store, on_step=on_step, api=api)
     _append_tickets(tickets)
     return tickets
 
@@ -340,13 +384,15 @@ def main() -> None:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--ids", help="alert_ids separados por comas")
     g.add_argument("--file", help="JSONL / JSON con alertas (pueden ser nuevas)")
-    g.add_argument("--random", type=int, metavar="N", help="N alertas al azar del dataset (simulacro)")
+    g.add_argument("--random", type=int, metavar="N", help="N alertas al azar de la API/dataset (simulacro)")
+    g.add_argument("--queue", type=int, metavar="N", help="las N primeras de la cola de la API (status=new)")
     g.add_argument("--sample", action="store_true", help="las 150 alertas de desarrollo")
     g.add_argument("--all", action="store_true", help="las 11.061 alertas")
     m = ap.add_mutually_exclusive_group()
     m.add_argument("--live", action="store_true", help="IA en todas las alertas (modo defensa)")
     m.add_argument("--no-llm", action="store_true", help="solo política, sin IA")
     ap.add_argument("--workers", type=int, default=5)
+    ap.add_argument("--local", action="store_true", help="no usar la API del SOC (solo el dataset local)")
     ap.add_argument("--seed", type=int)
     c = ap.add_mutually_exclusive_group()
     c.add_argument("--cache", dest="cache", action="store_true", default=None,
@@ -362,8 +408,11 @@ def main() -> None:
     t_load = time.perf_counter()
     store = get_store()
     print(f"Datos cargados en {time.perf_counter() - t_load:.1f}s")
+    api = None if args.local else get_api()
+    if api:
+        print(f"API del SOC ({api.base}): {'disponible' if api.available() else 'NO disponible → todo en local'}")
     alerts = select_alerts(store, ids=args.ids, file=args.file, random_n=args.random, sample=args.sample,
-                           all_=args.all, seed=args.seed)
+                           all_=args.all, queue_n=args.queue, seed=args.seed, api=api)
     if not alerts:
         print("No hay alertas que triar.")
         return
@@ -385,7 +434,7 @@ def main() -> None:
     t0 = time.perf_counter()
     tickets = run(alerts, mode=mode, workers=args.workers, store=store, on_step=on_step,
                   dedup=False if args.no_dedup else None, use_cache=args.cache,
-                  save_traces=not args.all)
+                  save_traces=not args.all, api=(api or False) if mode == "live" else False)
     secs = time.perf_counter() - t0
 
     out = Path(args.out) if args.out else config.OUTPUT_DIR / ("tickets_all.jsonl" if args.all else "tickets.jsonl")

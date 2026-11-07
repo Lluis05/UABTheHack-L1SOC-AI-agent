@@ -305,6 +305,11 @@ tickets = run(alerts, mode="live", workers=5, on_step=lambda alert_id, step, inf
 # pasos de on_step: context → policy → llm → reviewer → ticket (o "error"); data = {trace_entry?, ticket?, error?, message?}
 # triage_live(alerts=…, ids=…, random=N, on_step=…) = run(mode="live") + añade a output/tickets.jsonl (para el dashboard)
 ```
+- **API del SOC de Deloitte (`soc/data/api.py`)** — Deloitte (Discord, 15:50): *"mejor usar la API"* para leer las alertas.
+  - **Entrada:** `--ids`, `--random N`, `--queue N` y el dashboard leen las alertas de la API (`GET /alerts/{id}`, `GET /alerts?status=new`) si está levantada; si no, del dataset local (con aviso). `--sample`/`--all` siempre en local. `--local` desactiva la API.
+  - **Enriquecimiento híbrido (`HybridStore`):** primero el índice en memoria (ms); lo que no esté en local (alerta, evento, activo, usuario, intel o sandbox nuevos) se pide a la API, con timeouts cortos y máx. 25 llamadas por alerta. Solo en modo `live` (en lotes no se satura la API).
+  - **Traza:** la entrada (`intake`: de dónde se leyó la alerta) y cada llamada a la API (`api_cmdb`, `api_logs`…) aparecen en la traza con `source: "API SOC"`.
+  - Configuración: `SOC_API_URL`, `SOC_API_MODE=auto|local`, `SOC_API_TIMEOUT`, `SOC_API_LOGS_TIMEOUT`, `SOC_API_MAX_CALLS`.
 - **Entrada defensiva** (`soc/data/normalize.py`): toda alerta pasa por `normalize_alert` al entrar en `run()`. Fechas raras/epoch, severidad en castellano o desconocida, `entities`/`evidence`/`mitre`/`related_events` con tipos inesperados, Unicode inválido y textos enormes se corrigen sin inventar nada; lo corregido queda en `x_input_warnings` del ticket y en `open_questions`. No altera ninguna de las 11.061 alertas del dataset.
 - **Métricas del batch** (`soc/metrics.py`): `--all` escribe `output/metrics.json` con las claves de `compute_metrics` del dashboard (`total`, `auto_closed`, `llm`, `escalated`, `by_*`, `time_saved_hours`…) más `decided_by_policy_pct`, `pending_ai`, `pending_ai_high_or_critical`, `injection_attempts`, `alerts_per_second`, `top_rules_pending_ai` y `top_rules_true_positive`.
 - **En `live` (CLI `--live` y `triage_live`) NO se usa la caché de respuestas LLM:** el jurado ve a la IA razonar cada alerta en el momento. `--cache` la fuerza (solo para ensayos rápidos).
