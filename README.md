@@ -62,24 +62,33 @@ Un agente que hace el trabajo de un analista L1 de punta a punta y entrega a L2 
   2. **Google Gemini** (free tier) como fallback
 - **Orquestación del agente:** pipeline propio en Python con salida estructurada (JSON Schema)
 - **Enriquecimiento:** VirusTotal, AbuseIPDB, MITRE ATT&CK (STIX)
-- **Backend:** FastAPI
-- **Frontend / Dashboard:** Streamlit o React
-- **Almacenamiento:** SQLite / JSON
+- **API del SOC:** mock_soc_api (FastAPI) proporcionada por Deloitte
+- **Dashboard:** Streamlit
+- **Datos:** índices en memoria sobre el dataset de Deloitte + API simulada para contención
 
-> El stack se ajustará cuando conozcamos el formato de las alertas proporcionadas por Deloitte.
+> Detalles en [docs/04_arquitectura.md](docs/04_arquitectura.md).
 
-## 📁 Estructura del proyecto (prevista)
+## 📚 Documentación
+
+Toda la documentación del equipo está en [`docs/`](docs/00_INDICE.md): el reto, el dataset, la política del SOC,
+la arquitectura y los contratos, el reparto, el setup, la capa LLM y la demo.
+Para trabajar con Claude Code, ver [`CLAUDE.md`](CLAUDE.md).
+
+## 📁 Estructura del proyecto
 
 ```
 .
-├── agent/              # Lógica del agente (triage, revisor, prompts)
-├── enrichment/         # Conectores de threat intel y extracción de IOCs
-├── ingestion/          # Lectura y normalización de alertas
-├── correlation/        # Agrupación de alertas en incidentes
-├── dashboard/          # Interfaz de visualización
-├── eval/               # Benchmark y métricas
-├── data/               # Alertas de ejemplo
-└── README.md
+├── soc/
+│   ├── llm.py          # Capa LLM: Claude Code → Gemini (fallback)
+│   ├── data/           # Carga e indexado del dataset
+│   ├── enrich/         # Contexto: CMDB, usuarios, TIP, GeoIP, sandbox, logs ±24h
+│   ├── policy/         # Matriz de severidad, cambios aprobados, reglas de Tarvia
+│   ├── triage/         # Prefiltro determinista, agente LLM, revisor
+│   ├── correlate/      # Agrupación en incidentes y cadena de ataque
+│   └── pipeline.py     # Orquestación y CLI
+├── dashboard/          # Streamlit: cola, traza, evidencias, aprobación humana
+├── eval/               # Etiquetas manuales y métricas
+└── docs/               # Documentación del equipo
 ```
 
 ## 🚀 Puesta en marcha
@@ -92,10 +101,10 @@ cd UABTheHack-L1SOC-AI-agent
 pip install -r requirements.txt
 cp .env.example .env        # añade GEMINI_API_KEY (fallback)
 claude                      # login en Claude Code (una sola vez)
-python -m agent.llm         # prueba rápida de la capa LLM
+python -m soc.llm          # prueba rápida de la capa LLM
 ```
 
-La capa LLM (`agent/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDERS` y pasa al siguiente si uno falla (límite de uso, timeout, error).
+La capa LLM (`soc/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDERS` y pasa al siguiente si uno falla (límite de uso, timeout, error).
 
 ## 🗺️ Roadmap
 
@@ -112,6 +121,8 @@ La capa LLM (`agent/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDER
 ## 👥 Equipo
 
 - **Lluis Sarries** — [@Lluis05](https://github.com/Lluis05)
+- _(compañero 2)_
+- _(compañero 3)_
 
 ---
 
