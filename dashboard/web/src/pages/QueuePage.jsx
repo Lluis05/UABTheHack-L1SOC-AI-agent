@@ -6,6 +6,7 @@ import {
 } from '../components/shared'
 import { DETAIL_TAB } from '../config/constants.js'
 import { useTicketActions } from '../hooks/useTicketActions.js'
+import { useTicketChat } from '../hooks/useTicketChat.js'
 import { useTicketTrace } from '../hooks/useTicketTrace.js'
 import { EMPTY_FILTERS, pendingCloseCount, queueTickets } from '../utils/tickets.js'
 
@@ -33,6 +34,8 @@ export default function QueuePage({ tickets, metrics, config, approver, selected
 function TicketDetail({ ticket, config, approver, onChanged, onClose }) {
   const { trace, error: traceError, loading } = useTicketTrace(ticket.ticket_id)
   const actions = useTicketActions(ticket.ticket_id, approver, onChanged)
+  // El chat vive en la ficha (no en el modal): la conversación se mantiene al cerrar y reabrir el modal
+  const chat = useTicketChat(ticket.ticket_id, config?.chat_max_turns)
   const [request, setRequest] = useState(null)
   const [tab, setTab] = useState(null)
 
@@ -43,14 +46,16 @@ function TicketDetail({ ticket, config, approver, onChanged, onClose }) {
 
   return (
     <AppStack gap={1.5}>
-      <TicketHeader ticket={ticket} onExpand={() => setTab(DETAIL_TAB.SUMMARY)} onClose={onClose} />
+      <TicketHeader ticket={ticket} onExpand={() => setTab(DETAIL_TAB.SUMMARY)} onAsk={() => setTab(DETAIL_TAB.CHAT)}
+                    onClose={onClose} />
       <TicketFactSheet ticket={ticket} traceSteps={trace.length} onOpen={setTab} />
       <ActionsPanel ticket={ticket} config={config} onRequest={(action, kind) => setRequest({ action, kind })} />
       <DecisionPanel ticket={ticket} approver={approver} busy={actions.busy && !request}
                      error={request ? '' : actions.error} onDecide={actions.decide}
                      onShowHistory={() => setTab(DETAIL_TAB.HISTORY)} />
       <TicketDetailDialog ticket={ticket} tab={tab} onTabChange={setTab} onClose={() => setTab(null)}
-                          trace={trace} traceError={traceError} traceLoading={loading} />
+                          trace={trace} traceError={traceError} traceLoading={loading}
+                          chat={chat} chatMaxChars={config?.chat_max_question_chars} />
       <ConfirmActionDialog key={request ? `${request.action.action}-${request.action.target}` : 'closed'}
                            request={request} approver={approver} busy={actions.busy} error={actions.error}
                            onConfirm={confirm} onClose={closeDialog} />

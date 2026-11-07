@@ -73,6 +73,7 @@ dashboard/
   live.py                # triaje en directo: motores inprocess/subprocess/simulado (con tests)
   policy.py              # usa soc/policy/approvals.py (A) para decidir quién aprueba cada acción; carga el DataStore en segundo plano
   containment.py         # cliente de la API simulada (Persona C)
+  chat.py                # chat IA del ticket con Gemini: solo consulta, sin herramientas (docs/12_chatbot.md)
   sample/                # tickets/incidentes/trazas de EJEMPLO con este contrato (se usan si no hay output/)
   web/                   # frontend React + Material UI + Vite (Persona C); base → shared → pages
 eval/
@@ -383,3 +384,13 @@ Para el triaje en directo, el backend usa, por orden:
    producirse (para verla en vivo) y al final `on_step(alert_id, "ticket", {"ticket": {...}})`. Las 10 en paralelo las gestiona el pipeline.
 2. **Subproceso (fallback):** `python -m soc.pipeline --live --file/--ids/--random` y lee los tickets nuevos de
    `output/tickets.jsonl` al acabar (sin progreso paso a paso).
+
+### Chat IA del ticket (dashboard ↔ Gemini) — ✅ IMPLEMENTADO (`dashboard/chat.py`, detalle en `docs/12_chatbot.md`)
+```http
+POST /api/tickets/{ticket_id}/chat   {"question": str, "history": [{"role": "user|model", "text": str}]}
+→ 200 {"answer": str, "model": str} · 404 ticket · 422 petición inválida · 502 Gemini falló · 503 sin GEMINI_API_KEY
+```
+- **Solo lectura:** el modelo no tiene herramientas ni acceso a contención/decisiones; no modifica el ticket.
+- Ve el ticket (con decisiones humanas aplicadas) + traza + contexto compactado, todo dentro de `<untrusted_data>`.
+- Sin estado en el servidor: el navegador reenvía el historial (últimos `CHAT_MAX_TURNS`).
+- Usa la API de Gemini directamente (no gasta cuota de Claude Code), con modelos de reserva si uno está saturado.

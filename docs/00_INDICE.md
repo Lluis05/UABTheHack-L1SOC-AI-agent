@@ -14,6 +14,7 @@ Pensada para que cada miembro del equipo se la pase a su Claude y podamos trabaj
 | [08_demo_y_pitch.md](08_demo_y_pitch.md) | Guion de la demo, pitch y one-pager para dirección | Persona C · Adrián (y todos al final) |
 | [09_hallazgos.md](09_hallazgos.md) | Hallazgos sobre el dataset que vamos descubriendo (documento vivo) | Todos |
 | [11_registro_b_y_d.md](11_registro_b_y_d.md) | Registro de lo hecho en B (agente, evaluación, inyección) y D (hunting, correlación, informes): cómo reproducirlo, decisiones y pendientes | Todos (antes de integrar en main) |
+| [12_chatbot.md](12_chatbot.md) | Chat IA del ticket (Gemini): uso, endpoint, qué datos ve la IA, seguridad, modelos de reserva, tests | Todos (dashboard y demo) |
 | **[10_paso_a_paso.md](10_paso_a_paso.md)** | **Checklist paso a paso de cada persona, con prompts para Claude** | **Todos: empezad aquí** |
 
 **Repos:**

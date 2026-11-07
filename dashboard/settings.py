@@ -50,6 +50,18 @@ STEP_TICKET = "ticket"
 STEP_ERROR = "error"
 LIVE_STEPS = ("context", "policy", "llm", "reviewer", STEP_TICKET)
 
+# Chat del ticket con Gemini (dashboard/chat.py, docs/12_chatbot.md)
+CHAT_DEFAULT_MODEL = "gemini-3.8-flash"   # si no hay CHAT_GEMINI_MODEL ni GEMINI_MODEL en .env
+# Reserva si el modelo principal está saturado (503) o sin cuota (429). Sobrescribible con CHAT_FALLBACK_MODELS.
+CHAT_FALLBACK_MODELS = ("gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite")
+CHAT_RETRYABLE_CODES = (404, 429, 500, 503, 504)
+CHAT_TIMEOUT_S = 45                       # por modelo; el analista espera la respuesta en directo
+CHAT_MAX_QUESTION_CHARS = 2000
+CHAT_MAX_TURNS = 12                       # mensajes previos (pregunta + respuesta) que se reenvían al modelo
+CHAT_MAX_CONTEXT_CHARS = 30_000           # contexto de la alerta compactado (≈8k tokens)
+CHAT_MAX_DATA_CHARS = 80_000              # tope del bloque <untrusted_data> completo
+CHAT_TEMPERATURE = 0.2                    # respuestas pegadas a los datos
+
 LIVE_MODE_INPROCESS = "inprocess"
 LIVE_MODE_SUBPROCESS = "subprocess"
 LIVE_MODE_SIMULATED = "simulated"

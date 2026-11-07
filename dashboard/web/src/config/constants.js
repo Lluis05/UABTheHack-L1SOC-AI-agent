@@ -95,12 +95,26 @@ export const PAGES = [
 export const APP_TITLE = 'Dashboard de incidencias'
 
 // Información extendida del ticket (modal con pestañas): lo que no cabe en la ficha sin hacer scroll
-export const DETAIL_TAB = { SUMMARY: 'summary', EVIDENCE: 'evidence', TRACE: 'trace', HISTORY: 'history' }
+export const DETAIL_TAB = { SUMMARY: 'summary', EVIDENCE: 'evidence', TRACE: 'trace', HISTORY: 'history', CHAT: 'chat' }
 export const DETAIL_TABS = [
   { value: DETAIL_TAB.SUMMARY, label: 'Resumen' },
   { value: DETAIL_TAB.EVIDENCE, label: 'Evidencias' },
   { value: DETAIL_TAB.TRACE, label: 'Consultas' },
   { value: DETAIL_TAB.HISTORY, label: 'Historial' },
+  { value: DETAIL_TAB.CHAT, label: 'Chat IA' },
+]
+
+// Chat del ticket con Gemini (dashboard/chat.py, docs/12_chatbot.md). Los máximos reales llegan de /api/config.
+export const CHAT_ROLE = { USER: 'user', MODEL: 'model', ERROR: 'error' }
+export const CHAT_DEFAULT_MAX_CHARS = 2000
+export const CHAT_DEFAULT_MAX_TURNS = 12
+export const CHAT_SUGGESTIONS = [
+  '¿Por qué se ha cerrado (o escalado) este ticket?',
+  '¿Qué reglas de la política han disparado y qué significan?',
+  '¿Cómo se ha calculado la severidad?',
+  '¿En qué evidencias se basa el veredicto?',
+  '¿Quién decidió cada cosa: la política, la IA o una persona?',
+  '¿Qué queda pendiente o sin resolver?',
 ]
 
 // Filtro «listas para cerrar»: valor del select (los filtros son cadenas; '' = sin filtro)

@@ -1,5 +1,6 @@
 import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined'
 import BoltOutlined from '@mui/icons-material/BoltOutlined'
+import ChatBubbleOutline from '@mui/icons-material/ChatBubbleOutline'
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined'
 import FilterListRounded from '@mui/icons-material/FilterListRounded'
 import GavelOutlined from '@mui/icons-material/GavelOutlined'
@@ -14,6 +15,7 @@ import TrendingUpRounded from '@mui/icons-material/TrendingUpRounded'
 // Catálogo cerrado de iconos: el resto de la app los pide por nombre y nunca importa @mui/icons-material.
 const ICONS = {
   actions: BoltOutlined,
+  chat: ChatBubbleOutline,
   escalation: TrendingUpRounded,
   evidence: ManageSearchRounded,
   expand: OpenInFullRounded,

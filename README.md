@@ -53,6 +53,7 @@ Un agente que hace el trabajo de un analista L1 de punta a punta y entrega a L2 
 | **Aprendizaje del feedback del analista** | Las correcciones de L2 se guardan y se usan como ejemplos en futuros triajes. |
 | **Métricas medibles** | Benchmark de precisión/recall frente al ground truth y tiempo ahorrado por alerta. |
 | **Dashboard en tiempo real** | Visualización de la cola de alertas, veredictos, mapa MITRE e incidentes. |
+| **Chat IA dentro de cada ticket** | El analista pregunta en lenguaje natural (Gemini) por qué se cerró o escaló un ticket, qué reglas de la política aplicaron, cómo se calculó la severidad o en qué evidencias se basa. Solo consulta: no puede ejecutar acciones. Ver [`docs/12_chatbot.md`](docs/12_chatbot.md). |
 
 ## 🧱 Stack tecnológico (propuesto)
 
@@ -86,7 +87,7 @@ Para trabajar con Claude Code, ver [`CLAUDE.md`](CLAUDE.md).
 │   ├── triage/         # Prefiltro determinista, agente LLM, revisor
 │   ├── correlate/      # Agrupación en incidentes y cadena de ataque
 │   └── pipeline.py     # Orquestación y CLI
-├── dashboard/          # React + FastAPI: cola, traza, evidencias, aprobación humana, triaje en vivo
+├── dashboard/          # React + FastAPI: cola, traza, evidencias, aprobación humana, triaje en vivo, chat IA del ticket
 ├── eval/               # Etiquetas manuales y métricas
 └── docs/               # Documentación del equipo
 ```
