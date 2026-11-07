@@ -17,7 +17,7 @@ Modos:
 
 API para el dashboard (C4) — contrato "Dashboard ↔ pipeline" de docs/04:
     from soc.pipeline import run, triage_live
-    tickets = triage_live(alerts=[...] | ids=[...] | random=10, on_step=cb)     # siempre modo live
+    tickets = triage_live(alerts=[...] | ids=[...] | random=10, on_step=cb)     # modo lotes (TRIAGE_MODE)
     tickets = run(alerts, mode="live|normal|no_llm", on_step=cb)
     cb(alert_id, step, data): step ∈ context | policy | llm | reviewer | ticket | error
                               data = {"trace_entry"?: {...}, "ticket"?: Ticket, "error"?: str, "message"?: str}
@@ -446,9 +446,16 @@ def _run_llm(groups: list[list[dict]], hints: dict, workers: int, use_cache: boo
     pool.shutdown(wait=False, cancel_futures=True)
 
 
+# Modo del triaje que lanza el dashboard. Por decisión del equipo es "normal" (lotes: la política cierra lo
+# inequívoco y la IA solo ve lo ambiguo), también en la demo. TRIAGE_MODE=live vuelve a pasar todo por la IA.
+DASHBOARD_TRIAGE_MODE = os.getenv("TRIAGE_MODE", "normal")
+
+
 def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, random: int = 0,
-                on_step: OnStep | None = None, workers: int = 5) -> list[dict]:
-    """Punto de entrada del dashboard (contrato docs/04): tría en directo, IA en todas, progreso paso a paso."""
+                on_step: OnStep | None = None, workers: int = 5, mode: str | None = None) -> list[dict]:
+    """Punto de entrada del dashboard (contrato docs/04): tría las alertas con progreso paso a paso.
+    mode: por defecto DASHBOARD_TRIAGE_MODE ("normal", modo lotes); el nombre se mantiene por el contrato."""
+    mode = mode or DASHBOARD_TRIAGE_MODE
     store = get_store()
     api = get_api()
     # El dashboard puede mandar un envoltorio ({"alerts": [...]}, formato de la API…) como si fuera una alerta
@@ -460,7 +467,8 @@ def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, 
         sel += select_alerts(store, ids=",".join(ids), api=api)
     if random:
         sel += select_alerts(store, random_n=random, api=api)
-    tickets = run(sel, mode="live", workers=workers, store=store, on_step=on_step, api=api)
+    # Los incidentes nuevos del lote se guardan siempre: el dashboard los lee de output/incidents.jsonl
+    tickets = run(sel, mode=mode, workers=workers, store=store, on_step=on_step, api=api, save_incidents_file=True)
     _append_tickets(tickets)
     return tickets
 

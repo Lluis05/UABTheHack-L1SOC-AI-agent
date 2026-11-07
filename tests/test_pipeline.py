@@ -65,7 +65,8 @@ def test_triage_live_contract_with_dashboard(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path)
     monkeypatch.setattr(agent, "cached_complete", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("sin IA")))
     events = []
-    tickets = p.triage_live(ids=["ALR-20261005-000301"], on_step=lambda a, s, d: events.append((a, s, d)))
+    tickets = p.triage_live(ids=["ALR-20261005-000301"], on_step=lambda a, s, d: events.append((a, s, d)),
+                            mode="live")
     assert len(tickets) == 1 and tickets[0]["x_mode"] == "no_ai_fallback"
     assert any(d.get("trace_entry") for _, _, d in events)
     assert [s for _, s, d in events if d.get("ticket")] == ["ticket"]
@@ -123,3 +124,16 @@ def test_load_incidents_missing_file_is_empty(tmp_path):
     assert load_incidents(f) == []
     save_incidents([{"incident_id": "INC-0001", "alert_ids": ["A"]}], f)
     assert [i["incident_id"] for i in load_incidents(f)] == ["INC-0001"]
+
+
+def test_dashboard_triage_defaults_to_batch_mode(monkeypatch, tmp_path):
+    """El dashboard tría en modo lotes: la política cierra lo inequívoco sin llamar a la IA."""
+    import soc.pipeline as p
+    import soc.triage.agent as agent
+    from soc import config
+
+    assert p.DASHBOARD_TRIAGE_MODE == "normal"
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(agent, "cached_complete", lambda *a, **k: (_ for _ in ()).throw(AssertionError("IA llamada")))
+    tickets = p.triage_live(ids=["ALR-20261005-000301"])           # SCCM: la política lo cierra sola
+    assert len(tickets) == 1 and tickets[0]["x_mode"] == "policy"
