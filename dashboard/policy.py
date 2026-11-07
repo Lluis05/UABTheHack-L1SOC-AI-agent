@@ -11,6 +11,7 @@ import threading
 from typing import Callable
 
 from soc.policy.approvals import API_ACTIONS, approval_for
+from soc.policy.closure import closes_after_actions
 
 log = logging.getLogger(__name__)
 
@@ -48,10 +49,12 @@ def approval(action: str, target: str, store) -> dict:
 
 
 def annotate_ticket(ticket: dict, store) -> dict:
-    """Copia del ticket con x_approval en cada acción recomendada: allowed, requires_approval, approvers, note."""
+    """Copia del ticket con lo que decide la política para la UI:
+    x_approval en cada acción (allowed, requires_approval, approvers, note) y x_pending_close (solo le faltan
+    las acciones de la API para cerrarse)."""
     actions = [{**a, "x_approval": approval(a.get("action", ""), a.get("target", ""), store)}
                for a in ticket.get("recommended_actions") or []]
-    return {**ticket, "recommended_actions": actions}
+    return {**ticket, "recommended_actions": actions, "x_pending_close": closes_after_actions(ticket)}
 
 
 def is_api_action(action: str) -> bool:

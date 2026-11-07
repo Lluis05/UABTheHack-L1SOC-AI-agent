@@ -103,6 +103,10 @@ export const DETAIL_TABS = [
   { value: DETAIL_TAB.HISTORY, label: 'Historial' },
 ]
 
+// Filtro «listas para cerrar»: valor del select (los filtros son cadenas; '' = sin filtro)
+export const PENDING_CLOSE = 'yes'
+export const PENDING_CLOSE_LABEL = 'Listas para cerrar'
+
 // Tags visibles por fila de la ficha antes de resumir en «+N»
 export const MAX_ROW_TAGS = 4
 // Líneas de resumen en cada tarjeta de la cola

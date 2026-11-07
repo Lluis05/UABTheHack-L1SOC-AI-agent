@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { AppButton, AppChip, AppDialog, AppGrid, AppIconButton, AppSelect, AppStack, AppText, AppTextField } from '../base'
-import { DECIDER, SEVERITY_ORDER, STATUS_ORDER, VERDICT_ORDER } from '../../config/constants.js'
+import {
+  DECIDER, PENDING_CLOSE, PENDING_CLOSE_LABEL, SEVERITY_ORDER, STATUS_ORDER, VERDICT_ORDER,
+} from '../../config/constants.js'
 import { chipProps, optionsFor } from '../../utils/chips.js'
 import { countLabel } from '../../utils/format.js'
 import { activeFilterCount, EMPTY_FILTERS } from '../../utils/tickets.js'
@@ -12,19 +14,29 @@ const FILTER_SELECTS = [
   { key: 'severity', label: 'Severidad', options: optionsFor('severity', SEVERITY_ORDER), chip: 'severity' },
   { key: 'verdict', label: 'Veredicto', options: optionsFor('verdict', VERDICT_ORDER), chip: 'verdict' },
   { key: 'decider', label: 'Responsable', options: optionsFor('decider', [DECIDER.POLICY, DECIDER.LLM, DECIDER.HUMAN]), chip: 'decider' },
+  { key: 'pendingClose', label: 'Acciones pendientes', options: [{ value: PENDING_CLOSE, label: PENDING_CLOSE_LABEL }] },
 ]
+const filterValueLabel = (f, value) => (f.chip ? chipProps(f.chip, value).label : f.options.find((o) => o.value === value)?.label)
 
-// Barra de la cola: botón «Filtros» (abre el modal), filtros activos quitables y recuento.
-export default function TicketFilters({ filters, onChange, shown, total }) {
+// Barra de la cola: botón «Filtros» (abre el modal), acceso directo a «Listas para cerrar», filtros activos
+// quitables y recuento. pendingClose: cuántos tickets solo esperan a que el N1 ejecute sus acciones.
+export default function TicketFilters({ filters, onChange, shown, total, pendingClose = 0 }) {
   const [open, setOpen] = useState(false)
   const active = activeFilterCount(filters)
   const clear = (key) => () => onChange({ ...filters, [key]: '' })
   return (
     <AppStack direction="row" gap={1} wrap>
       <AppIconButton icon="filter" label="Filtros" badge={active} onClick={() => setOpen(true)} />
+      {pendingClose > 0 || filters.pendingClose ? (
+        <AppButton variant={filters.pendingClose ? 'primary' : 'secondary'} aria-pressed={Boolean(filters.pendingClose)}
+                   title="Tickets que se cierran en cuanto el N1 ejecute sus acciones pendientes"
+                   onClick={() => onChange({ ...filters, pendingClose: filters.pendingClose ? '' : PENDING_CLOSE })}>
+          {PENDING_CLOSE_LABEL} ({pendingClose})
+        </AppButton>
+      ) : null}
       {filters.text.trim() ? <AppChip label={`id: ${filters.text.trim()}`} variant="code" onDelete={clear('text')} /> : null}
       {FILTER_SELECTS.filter((f) => filters[f.key]).map((f) => (
-        <AppChip key={f.key} label={`${f.label}: ${chipProps(f.chip, filters[f.key]).label}`} onDelete={clear(f.key)} />
+        <AppChip key={f.key} label={`${f.label}: ${filterValueLabel(f, filters[f.key])}`} onDelete={clear(f.key)} />
       ))}
       {active > 0 ? <AppButton variant="link" onClick={() => onChange(EMPTY_FILTERS)}>Quitar filtros</AppButton> : null}
       <AppStack direction="row" grow justify="flex-end">

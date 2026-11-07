@@ -5,7 +5,12 @@ const SEVERITY_RANK = rank(SEVERITY_ORDER)
 const STATUS_RANK = rank(STATUS_ORDER)
 const UNKNOWN_RANK = Number.MAX_SAFE_INTEGER
 
-export const EMPTY_FILTERS = { text: '', severity: '', verdict: '', status: '', decider: '' }
+export const EMPTY_FILTERS = { text: '', severity: '', verdict: '', status: '', decider: '', pendingClose: '' }
+
+// Tickets a los que solo les faltan las acciones de la API para cerrarse (x_pending_close lo calcula la política)
+export function pendingCloseCount(tickets = []) {
+  return tickets.filter((t) => t.x_pending_close).length
+}
 
 // Cuántos filtros hay activos (el número del botón «Filtros»)
 export function activeFilterCount(filters) {
@@ -18,6 +23,7 @@ export function matchesFilters(ticket, filters) {
     && (!filters.verdict || ticket.verdict === filters.verdict)
     && (!filters.status || ticket.x_status === filters.status)
     && (!filters.decider || ticket.x_decided_by?.verdict === filters.decider)
+    && (!filters.pendingClose || Boolean(ticket.x_pending_close))
     && (!needle || searchableText(ticket).includes(needle))
 }
 

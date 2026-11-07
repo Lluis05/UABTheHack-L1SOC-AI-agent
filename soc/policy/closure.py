@@ -93,3 +93,12 @@ def status_for(ticket: dict) -> str:
                          bool((ticket.get("escalation") or {}).get("escalate")), ticket.get("recommended_actions") or [],
                          ticket.get("confidence", 0.0), (ticket.get("x_decided_by") or {}).get("verdict", ""),
                          ticket.get("executed_actions") or [])
+
+
+def closes_after_actions(ticket: dict) -> bool:
+    """¿Solo le faltan las acciones de la API para cerrarse? (cola «listas para cerrar» del dashboard)."""
+    pending = pending_actions(ticket.get("recommended_actions") or [], ticket.get("executed_actions") or [])
+    if not pending or status_for(ticket) == STATUS_CLOSED:
+        return False
+    done = {**ticket, "executed_actions": [*(ticket.get("executed_actions") or []), *pending]}
+    return status_for(done) == STATUS_CLOSED

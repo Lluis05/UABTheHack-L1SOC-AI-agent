@@ -27,6 +27,9 @@ function TicketCard({ ticket: t, selected, onSelect }) {
             <AppStack direction="row" gap={0.5} wrap>
               <AppChip {...chipProps('severity', t.severity)} />
               <AppChip {...chipProps('status', t.x_status)} />
+              {t.x_pending_close ? (
+                <AppChip label="Falta ejecutar" tone="warning" title="Se cierra en cuanto el N1 ejecute sus acciones" />
+              ) : null}
             </AppStack>
           </AppStack>
           {t.confidence != null ? <AppRing value={toPercent(t.confidence)} label="Confianza" tone="llm" /> : null}

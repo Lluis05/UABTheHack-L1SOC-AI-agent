@@ -1,7 +1,7 @@
 """Criterios de cierre (runbooks) y escalado obligatorio (política §5): soc/policy/closure.py."""
 from soc.data.store import get_store
 from soc.enrich.context import build_context
-from soc.policy.closure import LLM_CLOSE_MIN_CONFIDENCE, mandatory_escalation, ticket_status
+from soc.policy.closure import LLM_CLOSE_MIN_CONFIDENCE, closes_after_actions, mandatory_escalation, ticket_status
 from soc.policy.rules import r_terraform_pipeline
 from soc.triage.prefilter import deterministic_ticket
 
@@ -45,6 +45,16 @@ def test_llm_needs_confidence_to_close_but_policy_does_not():
     assert ticket_status("false_positive", "informational", False, CLOSE, low, "llm") == "triaged"
     assert ticket_status("false_positive", "informational", False, CLOSE, LLM_CLOSE_MIN_CONFIDENCE, "llm") == "closed"
     assert ticket_status("false_positive", "informational", False, CLOSE, low, "policy") == "closed"
+
+
+def test_closes_after_actions_only_when_actions_are_all_that_is_missing():
+    base = {"verdict": "true_positive", "severity": "low", "escalation": {"escalate": False}, "confidence": 0.9,
+            "x_decided_by": {"verdict": "llm"}, "recommended_actions": [N1_BLOCK, *CLOSE]}
+    assert closes_after_actions(base)
+    assert not closes_after_actions({**base, "executed_actions": [N1_BLOCK]})          # ya cerrado
+    assert not closes_after_actions({**base, "severity": "medium"})                     # no se cerraría
+    assert not closes_after_actions({**base, "recommended_actions": CLOSE})            # nada pendiente
+    assert closes_after_actions({**base, "verdict": "false_positive", "recommended_actions": [NEEDS_N2]})
 
 
 # ------------------------------------------------------------ mandatory_escalation

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ACTION_KIND, INPUT_MODE } from '../config/constants.js'
 import {
   actionKind, activeFilterCount, affectedGroups, affectedValues, approversLabel, EMPTY_FILTERS, findExecution, queueTickets,
-  splitVisible,
+  pendingCloseCount, splitVisible,
 } from './tickets.js'
 import { alertElapsedSeconds, buildTriageRequest, parseAlerts, parseIds, stepStates, summarizeJob } from './triage.js'
 import { countLabel, formatDateTime, formatPercent, initials, toPercent } from './format.js'
@@ -155,5 +155,14 @@ describe('incidentes', () => {
   it('usa x_tactics y si no, las tácticas de la cadena sin repetir', () => {
     expect(incidentTactics({ x_tactics: ['A'], kill_chain: [{ tactic: 'B' }] })).toEqual(['A'])
     expect(incidentTactics({ kill_chain: [{ tactic: 'B' }, { tactic: 'C' }, { tactic: 'B' }] })).toEqual(['B', 'C'])
+  })
+})
+
+describe('listas para cerrar', () => {
+  const tickets = [{ ticket_id: 'A', x_pending_close: true }, { ticket_id: 'B' }, { ticket_id: 'C', x_pending_close: false }]
+  it('cuenta y filtra solo los que esperan a sus acciones', () => {
+    expect(pendingCloseCount(tickets)).toBe(1)
+    expect(queueTickets(tickets, { ...EMPTY_FILTERS, pendingClose: 'yes' }).map((t) => t.ticket_id)).toEqual(['A'])
+    expect(activeFilterCount({ ...EMPTY_FILTERS, pendingClose: 'yes' })).toBe(1)
   })
 })

@@ -7,7 +7,7 @@ import {
 import { DETAIL_TAB } from '../config/constants.js'
 import { useTicketActions } from '../hooks/useTicketActions.js'
 import { useTicketTrace } from '../hooks/useTicketTrace.js'
-import { EMPTY_FILTERS, queueTickets } from '../utils/tickets.js'
+import { EMPTY_FILTERS, pendingCloseCount, queueTickets } from '../utils/tickets.js'
 
 // Sin ticket abierto: tarjetas a todo el ancho. Con ticket: la cola ocupa 1/3 y la ficha los 2/3 restantes.
 export default function QueuePage({ tickets, metrics, config, approver, selectedId, onSelect, onChanged }) {
@@ -19,7 +19,8 @@ export default function QueuePage({ tickets, metrics, config, approver, selected
   return (
     <AppStack gap={2}>
       {ticket ? null : <MetricsBar metrics={metrics} />}
-      <TicketFilters filters={filters} onChange={setFilters} shown={rows.length} total={tickets.length} />
+      <TicketFilters filters={filters} onChange={setFilters} shown={rows.length} total={tickets.length}
+                     pendingClose={pendingCloseCount(tickets)} />
       {ticket ? (
         <AppSplit ratio="third" left={queue('column')}
                   right={<TicketDetail key={ticket.ticket_id} ticket={ticket} config={config} approver={approver}

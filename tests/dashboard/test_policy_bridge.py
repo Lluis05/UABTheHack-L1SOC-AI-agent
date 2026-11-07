@@ -57,7 +57,7 @@ def test_analyst_actions_and_no_store():
 def test_annotate_does_not_mutate_and_handles_missing_actions():
     original = make_ticket(("block_ioc", "1.2.3.4"))
     policy.annotate_ticket(original, None)
-    assert "x_approval" not in original["recommended_actions"][0]
+    assert "x_approval" not in original["recommended_actions"][0] and "x_pending_close" not in original
     assert policy.annotate_ticket({"ticket_id": "T2"}, None)["recommended_actions"] == []
 
 
