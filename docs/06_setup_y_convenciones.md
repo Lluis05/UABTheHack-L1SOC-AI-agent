@@ -15,6 +15,8 @@ pip install -r requirements.txt
 # 3. Configuración
 cp .env.example .env               # DATASET_DIR=../DTT-UAB-The-Hack ya apunta bien si clonaste al lado
 #    Rellenar GEMINI_API_KEY (gratis en https://aistudio.google.com/apikey)
+#    GEMINI_MODEL=gemini-3.8-flash (gemini-2.5-flash da 404 con claves nuevas). Plan gratis: 5 peticiones/min.
+#    Windows: export PYTHONUTF8=1 (o set PYTHONUTF8=1) para que los print con "→" no fallen en la consola cp1252
 
 # 4. Login en Claude Code (si no lo tienes ya)
 claude
