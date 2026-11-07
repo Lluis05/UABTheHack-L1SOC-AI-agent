@@ -15,6 +15,17 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
 | 15:00 | Lluis | 7 | 95 s, **sin caché** | 9/10 con IA, 1 ticket sin IA | Claude CLI devolvió `is_error` sin detalle y Gemini sin clave → añadido 1 reintento en `soc/llm.py` |
 | 15:10 | Lluis | 21 | **56 s, sin caché** | 10/10 con IA, 0 fallos | 7 TP (WAF bloqueado, scam sin clic), 3 FP (DocuSign, SCCM, viaje imposible falso) |
 
+## Métricas del batch completo (`--all --no-llm`, Lluis 16:00)
+- 11.061 alertas → 10.972 tickets (89 duplicados agrupados) en ~36 s (~300 alertas/s).
+- **86,9 % decididas por la política** sin IA; 5.384 cerradas automáticamente; 1.434 pendientes de IA (220 con severidad potencial high/critical, que se escalan a una persona).
+- 15 intentos de prompt injection detectados. Equivale a ~2.765 h de un N1 humano (15 min/alerta).
+- Reglas con más pendientes de IA (dónde afinar la política): UC-NET-001 (600), UC-EML-001 (319), UC-AI-001 (99), UC-NET-006 (91), UC-NET-005 (88), UC-WEB-002 (75).
+
+## Robustez (Lluis 16:00)
+- 16 tipos de alerta mal formada probados (`tests/test_robustness.py`): todas generan ticket, con y sin IA.
+- **Para Marc (B):** si el LLM devolviera algo fuera del esquema (p. ej. un string en `evidence` o en `recommended_actions`), `assemble_ticket` lanza `'str' object has no attribute 'get'` y la alerta cae al ticket sin IA. No rompe nada, pero se pierde el análisis: convendría filtrar elementos que no sean dict.
+- Los tests ya **no pueden llamar al LLM real** (`tests/conftest.py` lo bloquea): antes el revisor gastaba cuota en los tests y los hacía tardar 5 min.
+
 ## Datos (DataStore, Lluis 13:00)
 - Las **150 alertas de la muestra están incluidas** en `alertas.jsonl`. No hay alert_id duplicados.
 - Los **15.683 `related_events`** de todas las alertas existen en los logs: no hay referencias rotas.

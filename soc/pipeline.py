@@ -40,9 +40,11 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from soc import config
+from soc.data.normalize import normalize_alert
 from soc.data.store import DataStore, get_store
 from soc.enrich.context import build_context
 from soc.enrich.entities import entity_keys
+from soc.metrics import batch_metrics, write_metrics
 from soc.timeutil import parse
 from soc.triage.prefilter import deterministic_ticket, prefilter
 
@@ -136,7 +138,8 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
     """Tría alertas. mode: 'live' (IA en todas) | 'normal' (IA solo si hace falta) | 'no_llm'."""
     assert mode in ("live", "normal", "no_llm"), mode
     store = store or get_store()
-    alerts = list(alerts)
+    # Entrada defensiva: alertas nuevas o mal formadas se normalizan (y se anota qué se corrigió)
+    alerts = [normalize_alert(a, i) for i, a in enumerate(alerts)]
     lock = threading.Lock()
 
     def step(aid: str, s: str, data: dict | None = None) -> None:
@@ -181,8 +184,14 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
         rep = group[0]
         aid = (rep.get("alert") or {}).get("alert_id")
         t = _merge_group(t, group)
+        if t.get("triage_seconds") is None and rep.get("build_ms") is not None:
+            t["triage_seconds"] = round(rep["build_ms"] / 1000, 3)  # decidido por la política: solo contexto
         if save_traces:
             _save_trace(rep, t)
+        warns = (rep.get("alert") or {}).get("x_input_warnings")
+        if warns:
+            t["x_input_warnings"] = warns
+            t.setdefault("open_questions", []).append("Alerta de entrada corregida: " + "; ".join(warns[:3]))
         out_by_rep[aid] = t
         for c in group:
             step((c.get("alert") or {}).get("alert_id"), "ticket", {"ticket": t})
@@ -384,6 +393,9 @@ def main() -> None:
     with open(out, "w", encoding="utf-8") as f:
         for t in tickets:
             f.write(json.dumps(t, ensure_ascii=False, default=str) + "\n")
+    if args.all:  # métricas del batch completo para el dashboard (output/metrics.json)
+        mpath = write_metrics(batch_metrics(tickets, n_alerts=len(alerts), wall_seconds=secs, mode=mode))
+        print(f"Métricas del batch → {mpath}")
     print()
     if live_print:
         for t in tickets:

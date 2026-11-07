@@ -99,9 +99,9 @@ Eres el camino crítico: B y C dependen de tu A3.
 - **Terminado cuando:** `--sample` funciona de punta a punta con el agente de B y `--random 10 --live` tarda menos de 2 min.
 
 ### A6 · Escala y calidad (20:00 → 03:00)
-- [ ] `--all --no-llm` sobre las 11.061 → `output/tickets_all.jsonl` y métricas para C (cerradas por política, pendientes de IA, escaladas).
+- [x] `--all --no-llm` sobre las 11.061 → `output/tickets_all.jsonl` y **`output/metrics.json`** para C (`soc/metrics.py`). ✅
 - [ ] Revisar con B los errores de la evaluación y afinar reglas.
-- [ ] Alertas nuevas o mal formadas: campos ausentes, event_ids inexistentes, entidades vacías. **Nunca romper.**
+- [x] Alertas nuevas o mal formadas: campos ausentes, event_ids inexistentes, entidades vacías. **Nunca romper.** ✅ `soc/data/normalize.py` + `tests/test_robustness.py` (16 casos, con y sin IA)
 - [ ] Simulacro `--random 10 --live` cada 2 h. Apuntar los resultados en `docs/09_hallazgos.md`.
 
 ---
