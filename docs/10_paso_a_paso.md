@@ -31,7 +31,7 @@ Marca los checkbox según avances (edita este archivo y haz commit) para que el 
 **Misión:** que cualquier alerta (del dataset o nueva) tenga su contexto completo y su severidad calculada en menos de 1 s.
 Eres el camino crítico: B y C dependen de tu A3.
 
-### A1 · Config y DataStore (12:45 → 14:00)
+### A1 · Config y DataStore (12:45 → 14:00) ✅ HECHO (13:00)
 - **Archivos:** `soc/config.py`, `soc/data/store.py`.
 - **Qué:**
   - `config.py`: lee `.env` (DATASET_DIR, SOC_API_URL, OUTPUT_DIR=`output/`).

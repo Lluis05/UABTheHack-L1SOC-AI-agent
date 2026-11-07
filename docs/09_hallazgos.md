@@ -7,6 +7,13 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
   Ejemplo: SCCM "08:00-10:00" y la alerta ALR-20261005-000301 a las 07:56Z, que son las 09:56 en Barcelona (dentro de la ventana).
   España pasa de UTC+2 a UTC+1 el 25/10/2026. **Hay que confirmarlo** antes de basar decisiones en ventanas horarias.
 
+## Datos (DataStore, Lluis 13:00)
+- Las **150 alertas de la muestra están incluidas** en `alertas.jsonl`. No hay alert_id duplicados.
+- Los **15.683 `related_events`** de todas las alertas existen en los logs: no hay referencias rotas.
+- Todos los timestamps (incluido cloudtrail) tienen formato ISO UTC `...Z`, así que se pueden comparar como strings.
+- En EDR, el usuario viene como `TARVIA\usuario` o `NT AUTHORITY\SYSTEM`. `store.user()` ya acepta el formato `DOMINIO\usuario`.
+- Carga: 6,8 s desde los ficheros y 5 s desde la caché, con unos **1,7 GB de RAM**. Ojo si en el mismo portátil corren también la API simulada y el dashboard.
+
 ## Patrones de falsos positivos o benignos
 - UC-EDR-002: padre `CcmExec.exe`, usuario SYSTEM, `decoded_preview` con inventario (`Win32_Product` … `C:\Windows\CCM\Inventory`), que encaja con CHG-2026-1031.
   Ojo: el cambio dice `svc_sccm`, pero la alerta muestra `SYSTEM` (lo normal en el agente SCCM). Hay que decidir si es
