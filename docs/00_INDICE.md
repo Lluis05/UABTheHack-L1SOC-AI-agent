@@ -13,6 +13,7 @@ Pensada para que cada miembro del equipo se la pase a su Claude y podamos trabaj
 | [07_llm.md](07_llm.md) | Capa LLM, prompts, defensa contra prompt injection, gestión de cuota | Persona B |
 | [08_demo_y_pitch.md](08_demo_y_pitch.md) | Guion de la demo, pitch y one-pager para dirección | Persona C · Adrián (y todos al final) |
 | [09_hallazgos.md](09_hallazgos.md) | Hallazgos sobre el dataset que vamos descubriendo (documento vivo) | Todos |
+| **[10_paso_a_paso.md](10_paso_a_paso.md)** | **Checklist paso a paso de cada persona, con prompts para Claude** | **Todos: empezad aquí** |
 
 **Repos:**
 - Nuestro: https://github.com/Lluis05/UABTheHack-L1SOC-AI-agent

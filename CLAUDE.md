@@ -5,7 +5,7 @@ Equipo de 3 personas, cada una con su propio Claude. **Entrega: domingo 8 de nov
 
 ## Antes de hacer nada, lee
 1. `docs/00_INDICE.md` — mapa de toda la documentación.
-2. `docs/05_reparto_y_plan.md` — quién hace qué. **Trabaja solo en los módulos de tu persona** salvo que te lo pidan.
+2. `docs/10_paso_a_paso.md` — tus pasos concretos (y `docs/05_reparto_y_plan.md` para el plan). **Trabaja solo en los módulos de tu persona** salvo que te lo pidan.
 3. `docs/04_arquitectura.md` — **contratos entre módulos**. No cambies una interfaz pública sin avisar al equipo
    (y actualiza el doc en el mismo commit).
 

@@ -1,0 +1,233 @@
+# 10 · Paso a paso por persona
+
+Cada paso tiene: **qué hacer**, **qué archivos**, **cuándo está terminado** y un **prompt para tu Claude**.
+Marca los checkbox según avances (edita este archivo y haz commit) para que el resto vea el progreso.
+
+> Entrega: **domingo 08:00**. Puntos de integración: **15:30**, **19:00**, **00:00**. Congelación: **03:00**.
+> Prueba de aceptación en cada integración: `python -m soc.pipeline --random 10 --live` (simula la defensa).
+
+---
+
+## PASO 0 · Todos (15 min, ya)
+
+- [ ] Aceptar la invitación de colaborador al repo de GitHub (Lluis la envía).
+- [ ] Clonar ambos repos en la **misma carpeta padre**:
+  ```bash
+  git clone https://github.com/Lluis05/UABTheHack-L1SOC-AI-agent.git
+  git clone https://github.com/dttdfr/DTT-UAB-The-Hack.git
+  ```
+- [ ] Entorno: `python -m venv .venv`, activarlo, `pip install -r requirements.txt`.
+- [ ] `cp .env.example .env`. Comprobar que `DATASET_DIR` apunta al dataset. Poner `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey).
+- [ ] `claude` (login) y luego `python -m soc.llm`. Tiene que imprimir un veredicto en JSON.
+- [ ] Leer **15 min**: `docs/01_reto.md`, `docs/03_politica_y_contexto.md` y los contratos de `docs/04_arquitectura.md`.
+- [ ] Crear tu rama: `git checkout -b feat/<tu-modulo>`.
+- [ ] Arrancar tu Claude con:
+  > Lee CLAUDE.md y todo docs/. Soy la Persona X (ver docs/10_paso_a_paso.md). Vamos a hacer mis pasos en orden.
+  > Trabaja solo en mis módulos y respeta los contratos de docs/04_arquitectura.md. No añadas Co-Authored-By en los commits.
+
+---
+
+## PERSONA A · Datos y política — Lluis
+**Misión:** que cualquier alerta (del dataset o nueva) tenga su contexto completo y su severidad calculada en menos de 1 s.
+Eres el camino crítico: B y C dependen de tu A3.
+
+### A1 · Config y DataStore (12:45 → 14:00)
+- **Archivos:** `soc/config.py`, `soc/data/store.py`.
+- **Qué:**
+  - `config.py`: lee `.env` (DATASET_DIR, SOC_API_URL, OUTPUT_DIR=`output/`).
+  - `DataStore.__init__`: carga alertas (completas y muestra), inventario (activos, usuarios, RRHH, vulnerabilidades,
+    servicios, zonas, cambios), inteligencia (TIP, GeoIP, sandbox) y **los 18 logs**.
+  - Índices: `event_id → evento` (con `_source`) y `hostname/ip → activo`, `upn/username → usuario`.
+  - Caché en disco: tras la primera carga, guardar en `output/cache/store.pkl` para que los siguientes arranques sean rápidos.
+- **Terminado cuando:** `python -c "from soc.data.store import DataStore; s=DataStore(...); print(s.event('EDR-0005329'), s.asset('WS-BCN-1174'), s.user('alejandro.ruiz'))"` funciona y medimos el tiempo de carga (en frío y desde la caché).
+- **Prompt:** *"Implementa A1 de docs/10_paso_a_paso.md siguiendo el contrato DataStore de docs/04. Mide tiempos de carga."*
+
+### A2 · Índice por entidad y búsqueda temporal (14:00 → 15:00)
+- **Archivos:** `soc/data/store.py`, `soc/enrich/entities.py`.
+- **Qué:**
+  - `entities.py`: `extract_entities(alert) -> dict` que normaliza `entities` + `evidence` a
+    `{users, hosts, ips, domains, urls, hashes, customers, emails, processes}`. Extraer IOCs también del texto de evidence con regex.
+  - Índice invertido: valor de entidad (en minúsculas) → lista de `(timestamp, source, event_id)` ordenada por tiempo.
+    Campos a indexar por fuente: ver la tabla de `docs/02_dataset.md` (src_ip, dst_ip, hostname, user, user_upn, domain,
+    sha256, customer_id, email, sender, recipients, message_id, sourceIPAddress, userIdentity.userName…).
+  - `search(entity, start, end, sources, limit_per_source)` con búsqueda binaria por tiempo.
+  - `alerts_for_entity(entity, start, end)`.
+- **Terminado cuando:** `search()` responde en menos de 50 ms y `extract_entities` funciona sobre las 150 alertas de la muestra sin excepciones.
+- **Prompt:** *"Implementa A2. Prueba extract_entities sobre las 150 alertas de la muestra y reporta tipos de entidad que no se normalizan."*
+
+### A3 · build_context (15:00 → 15:30) 🔗 **ENTREGA CRÍTICA**
+- **Archivos:** `soc/enrich/context.py`.
+- **Qué:** `build_context(alert, store) -> Context` exactamente según `docs/04`: activos, usuarios (+RRHH),
+  related_events, entity_activity ±24 h (como mucho 30 eventos por entidad y fuente), intel y GeoIP de cada IP, dominio y hash, sandbox,
+  other_alerts ±7 días y **trace** con cada consulta y su tiempo.
+- **Volcar** `output/contexts_sample.jsonl` (las 150) y **subirlo a una rama o compartirlo** para B y C.
+- **Terminado cuando:** las 150 alertas generan contexto en menos de 1 s cada una y sin errores. Avisar a B y C.
+- **Prompt:** *"Implementa A3. Genera output/contexts_sample.jsonl y mide p50 y p95 de tiempo por alerta."*
+
+### A4 · Motor de política (15:30 → 17:30)
+- **Archivos:** `soc/policy/severity.py`, `soc/policy/rules.py`.
+- **Qué:**
+  - `severity.py`: matriz exacta de `docs/03`, ajustes ±1 (como máximo uno en total), regla de benign authorized →
+    informational/low, criticidad de identidades (VIP/privilegiado → Alta, adm/servicio crítico → Crítica, resto Media),
+    activo desconocido → Media. Devuelve `SeverityResult` con `rationale` en castellano.
+  - `rules.py`: funciones que devuelven `PolicyHit`. Mínimo:
+    - `PENTEST_WINDOW` (CHG-2026-1042: IPs 192.0.2.10-12, 08-10/10, WEB-ECOM).
+    - `NESSUS_SCAN` (NESSUS01/svc_scanner, miércoles 01-05, nunca OT).
+    - `SCCM_INVENTORY` (EDR-002 + padre CcmExec + ventana 08-10 local). **Si el padre es otro → `suspicious`**.
+    - `PSEXEC_DEPLOY` (CHG-2026-1057), `OT_MAINT` (CHG-2026-1063), `VPN_CERT` (1066), `LOGISOFT_UPDATE` (1071),
+      `BACKUP_OPERATORS` (1078), `EDR_UPGRADE` (1080), `PAYROLL_FLOW` (FLUJO-0007).
+    - Reglas internas: `ADM_OUTSIDE_JUMP01`, `ANYDESK_UNAPPROVED`, `SVC_BACKUP_NO_MFA` (context), `OT_UNAUTHORIZED_SRC`,
+      `LOGISOFT_OUTSIDE_HOURS`, `TARVIA_PKG_PUBLIC_REGISTRY`.
+    - RRHH: `USER_LEAVING` (baja, sobre todo nuria.vidal → competidor), `ACTIVITY_AFTER_LEAVE`, `USER_TRAVELING` (explica viaje imposible).
+    - TIP: `TI_MALICIOUS`, `TOR_OR_HOSTING`; si el indicador es desconocido → `context` ("desconocido ≠ limpio").
+    - `PROMPT_INJECTION_TEXT`: regex sobre campos de texto ("ignora", "ignore previous", "marca como", "system prompt"…).
+  - **Zona horaria:** helper `to_local(ts)` (UTC+2 hasta el 25/10 03:00, UTC+1 después). Las ventanas de cambios se comparan en hora local.
+- **Terminado cuando:** existen tests (`tests/test_policy.py`) para la matriz completa (25 celdas) y para cada regla
+  con un caso positivo y uno negativo.
+- **Prompt:** *"Implementa A4 con tests. Ejecuta las reglas sobre la muestra y dame un recuento de hits por regla."*
+
+### A5 · Prefiltro y pipeline (17:30 → 19:00) 🔗 **INTEGRACIÓN 2**
+- **Archivos:** `soc/triage/prefilter.py`, `soc/pipeline.py`.
+- **Qué:**
+  - `prefilter(context) -> dict | None`: decisión determinista cuando es inequívoca (p. ej., `PENTEST_WINDOW` +
+    WAF bloqueado → benign_true_positive). Devuelve un ticket parcial con `x_decided_by.verdict="policy"`.
+  - `pipeline.py` (CLI): `--sample`, `--ids`, `--file`, `--random N`, `--all`, `--live`, `--no-llm`, `--workers 5`.
+    Flujo: contexto → política → prefiltro → (LLM de B si `--live` o si el prefiltro devuelve None) → severidad final con
+    `compute_severity` → `requires_approval` según la tabla de aprobaciones → ticket → `output/tickets.jsonl` + `output/traces/`.
+    Imprimir el tiempo total y por alerta.
+  - Deduplicación: misma regla y mismas entidades en menos de 1 h → un solo ticket con varios `alert_ids`.
+- **Terminado cuando:** `--sample` funciona de punta a punta con el agente de B y `--random 10 --live` tarda menos de 2 min.
+
+### A6 · Escala y calidad (20:00 → 03:00)
+- [ ] `--all --no-llm` sobre las 11.061 → `output/tickets_all.jsonl` y métricas para C (cerradas por política, pendientes de IA, escaladas).
+- [ ] Revisar con B los errores de la evaluación y afinar reglas.
+- [ ] Alertas nuevas o mal formadas: campos ausentes, event_ids inexistentes, entidades vacías. **Nunca romper.**
+- [ ] Simulacro `--random 10 --live` cada 2 h. Apuntar los resultados en `docs/09_hallazgos.md`.
+
+---
+
+## PERSONA B · Agente IA y correlación
+**Misión:** que la IA razone como un buen N1, cite evidencias reales y no se deje manipular. Después, agrupar alertas en incidentes.
+
+### B1 · Conocer el terreno (12:45 → 13:30)
+- [ ] Leer los 10 runbooks (`DATASET_DIR/01_contexto/runbooks/`) y el catálogo de casos de uso.
+- [ ] Elegir **8 alertas de desarrollo** de la muestra que cubran: WEB-001, EML-001, EDR-002 (SCCM y otra), IDP-001,
+  NET-001, AI-001 y una high. Guardar sus IDs en `eval/dev_set.txt`.
+- **Prompt:** *"Lee los runbooks y la muestra. Propón 8 alertas de desarrollo variadas y explica por qué cada una."*
+
+### B2 · Agente de triaje v1 (13:30 → 15:30) 🔗 **INTEGRACIÓN 1**
+- **Archivos:** `soc/triage/agent.py`, `soc/triage/prompts/system.md`, `soc/triage/prompts/runbooks/` (o leerlos del dataset).
+- **Qué:**
+  - `triage(context, prefilter_hint=None) -> dict` usando `soc.llm.complete()` con JSON Schema (subset del Ticket
+    + `plus_reasons`/`minus_reasons`; ver `docs/07`).
+  - System prompt: rol N1, política resumida, reglas de Tarvia, **runbook de la regla** inyectado completo,
+    criterios de veredicto, "cita event_id", defensa contra inyección.
+  - El contexto va dentro de `<untrusted_data>` (escapando la etiqueta de cierre). Compactar a menos de 15.000 tokens.
+  - Caché por hash del prompt en `output/llm_cache/`.
+  - Mientras A3 no esté: construir 2-3 contextos a mano desde el dataset (o con un stub).
+- **Terminado cuando:** las 8 alertas de desarrollo producen tickets válidos y razonables.
+- **Prompt:** *"Implementa B2 según docs/07. Ejecuta sobre eval/dev_set.txt y muéstrame los 8 tickets resumidos."*
+
+### B3 · Revisor + paralelismo + robustez (15:30 → 17:30)
+- **Archivos:** `soc/triage/reviewer.py`, `soc/triage/agent.py`.
+- **Qué:**
+  - Validación **en código** (gratis): cada `evidence[].event_id` tiene que existir en el contexto; si no, se elimina y se baja la confianza.
+  - Revisor LLM **solo** si el veredicto es TP con severidad ≥ high, o si la confianza es < 0.6. Es más barato y se usa donde importa.
+  - `triage_many(contexts, workers=5)` con ThreadPoolExecutor, timeout de 90 s por alerta, y si todo falla se devuelve el prefiltro marcado como "sin IA".
+- **Terminado cuando:** con `LLM_PROVIDERS=bogus,gemini` sigue funcionando, y 10 alertas en paralelo tardan menos de 2 min.
+
+### B4 · Evaluación (17:30 → 19:00)
+- **Archivos:** `eval/labels_dev.jsonl`, `eval/evaluate.py`.
+- **Qué:** etiquetar a mano unas **40 alertas** de la muestra (veredicto y severidad esperados, con una línea de motivo),
+  repartidas entre reglas. `evaluate.py` compara con `output/tickets.jsonl`: accuracy del veredicto, acierto exacto
+  de severidad (±1) y matriz de confusión.
+- **Terminado cuando:** tenemos un número real de acierto para el pitch y una lista de errores para corregir.
+
+### B5 · Correlación en incidentes (20:00 → 00:00) — nivel 2
+- **Archivos:** `soc/correlate/incidents.py`.
+- **Qué:**
+  - Grafo de alertas que comparten entidades (usuario, host, IP externa, dominio, hash, message_id) dentro de una ventana
+    configurable (días). **Excluir entidades "hub"** (IPs de proxy, DCs, dominios populares, la IP del pentest, NESSUS01)
+    para no fusionarlo todo.
+  - Componentes conexos → `Incident` (ver `docs/04`). Ordenar por tiempo → `kill_chain` por táctica MITRE.
+  - En modo en vivo: para una alerta nueva, buscar a qué incidente existente se une (`x_incident_id`).
+  - Severidad del incidente = la máxima de sus alertas, +1 si forma una cadena (política §5).
+- **Terminado cuando:** sobre el dataset completo aparecen incidentes con sentido. Apuntar los mejores en `docs/09_hallazgos.md`.
+
+### B6 · Investigación nivel 3 (00:00 → 03:00)
+- [ ] Para incidentes escalados: un prompt LLM que redacte el informe según `informe_incidente.schema.json`
+  (origen, alcance, cronología y relación con otros incidentes).
+- [ ] Buscar activamente los incidentes escondidos (usuarios que se van, fraude IBAN, OT, supply chain, Vela, AWS…)
+  y comprobar que nuestro sistema los encuentra.
+- [ ] Redactar la sección "Lo que no resolvemos" en `docs/08_demo_y_pitch.md` con datos de la evaluación.
+
+---
+
+## PERSONA C · Dashboard, contención y presentación
+**Misión:** que el jurado *vea* cómo la IA hace el triaje y dónde decide la persona. Esto es lo que van a evaluar visualmente.
+
+### C1 · Esqueleto con datos falsos (12:45 → 14:00)
+- **Archivos:** `dashboard/app.py`, `dashboard/sample_tickets.jsonl` (datos falsos según el contrato de `docs/04`).
+- **Qué:** añadir `streamlit` a `requirements.txt`. Páginas: **Cola**, **Detalle de alerta/ticket**, **Incidentes**,
+  **Métricas**, **Defensa en directo**.
+  - Cola: tabla con severidad (color), veredicto, título, regla, `x_decided_by`, estado y filtros.
+- **Terminado cuando:** `streamlit run dashboard/app.py` muestra la cola con 5-10 tickets falsos.
+- **Prompt:** *"Implementa C1 con Streamlit. Crea 8 tickets falsos realistas usando el contrato Ticket de docs/04."*
+
+### C2 · Detalle y traza (14:00 → 15:30) 🔗 **INTEGRACIÓN 1**
+- **Qué:** vista de detalle con:
+  - Cabecera: título, veredicto, confianza (barra), severidad + `severity_rationale` (cómo se aplicó la matriz).
+  - **"Qué consultó la IA"**: la `trace` como timeline (paso → consulta → resultado → ms).
+  - **"En qué se basa"**: evidencias con `event_id` (expandibles al evento crudo), enrichment y `x_policy_hits`.
+  - **"Quién decidió qué"**: chips de colores, 🤖 IA, 📏 Política, 👤 Persona.
+  - Acciones recomendadas y `open_questions`.
+- A las 15:30, cambiar a `output/tickets.jsonl` real.
+
+### C3 · Aprobación humana y contención (15:30 → 18:00) — nivel 4
+- **Archivos:** `dashboard/containment.py`.
+- **Qué:**
+  - Cliente de la API simulada (`SOC_API_URL`): `approve(action, target, approver, reason)` y `contain(action, target, justification, token, ticket_id)`.
+  - En el detalle, cada acción con `requires_approval=true` lleva un botón **"Aprobar y ejecutar"**: pide el nombre del
+    aprobador (N2) → `POST /approvals` → `POST /containment/{accion}` → mostrar el resultado → guardar en
+    `executed_actions` y cambiar `x_status`.
+  - `block_ioc` y `purge_email` se ejecutan sin aprobación, pero **con confirmación del analista**.
+  - Botones del analista: "Confirmar veredicto", "Cambiar veredicto" (→ `x_decided_by.verdict = "human"`), "Escalar" y "Cerrar".
+  - Página "Registro de contención" con `GET /containment/log`.
+  - **Bloquear en la UI** las acciones sobre OT (la API también las rechaza).
+- **Terminado cuando:** se aprueba y ejecuta `revoke_sessions` y aparece en el log de la API.
+
+### C4 · Defensa en directo (18:00 → 20:00) ⭐ **la página más importante**
+- **Qué:** página "Defensa en directo":
+  - Entrada: pegar IDs, **pegar JSON de alertas** o subir JSONL.
+  - Botón "Triar". Llama al pipeline de A/B **dentro del proceso**, con el DataStore precargado mediante `st.cache_resource`.
+  - Progreso **en tiempo real** por alerta (contexto → política → IA → revisor → ticket) con `st.status` o similar,
+    y la traza apareciendo mientras se calcula.
+  - Al terminar: resumen (veredictos, severidades, escalados, tiempo total frente a los ~15 min por alerta de un humano).
+- Coordinar con A y B: necesitas una función de pipeline con **callback de progreso** (`on_step(alert_id, step, data)`).
+
+### C5 · Incidentes y métricas (20:00 → 00:00)
+- [ ] Página Incidentes: lista y, en el detalle, una **línea de tiempo de la cadena de ataque** (alertas por táctica MITRE a lo largo de los días) con las entidades implicadas.
+- [ ] Página Métricas (sobre `--all --no-llm` + muestra): % cerradas por política, % analizadas por IA, % escaladas,
+  distribución de severidades, tiempo medio, horas de analista ahorradas y acierto de la evaluación de B.
+
+### C6 · Presentación (00:00 → 06:00)
+- [ ] Slides (unas 8): problema → solución → arquitectura (IA / política / persona) → demo → resultados → seguridad
+  (prompt injection) → lo que no resolvemos → siguientes pasos.
+- [ ] **One-pager para el comité de dirección de Tarvia** (en lenguaje de negocio; ver `docs/08`).
+- [ ] Guion de la demo y **ensayo cronometrado** con un simulacro `--random 10`.
+- [ ] **Vídeo de respaldo** de la demo grabado antes de las 07:00.
+
+---
+
+## Puntos de integración (todos juntos, 15 min)
+| Hora | Qué tiene que funcionar | Responsable de que pase |
+|---|---|---|
+| **15:30** | 5 alertas reales: contexto (A) → agente (B) → ticket → dashboard (C) | A |
+| **19:00** | `--sample` completo + `--random 10 --live` < 2 min + aprobación y contención funcionando | B |
+| **00:00** | Incidentes + página de defensa en directo + métricas sobre todo el dataset | C |
+| **03:00** | 🧊 Congelación. Solo bugs. Simulacro completo de la defensa. | Todos |
+| **07:00** | Vídeo de respaldo, README final, `main` estable | Todos |
+
+## Si alguien termina antes
+Ayuda en el siguiente orden: (1) simulacros `--random 10` y corregir lo que rompa, (2) etiquetas de evaluación,
+(3) buscar incidentes escondidos para `docs/09`, (4) pulir el dashboard.
