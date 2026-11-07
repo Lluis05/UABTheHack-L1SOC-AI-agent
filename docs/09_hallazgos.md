@@ -45,6 +45,22 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
   - **TPV POS-T07-01** (tienda T07): servicio `PosUpdateSvc` → `possvc.exe` **sin firma** que lee la memoria de `TarviaPOS.exe` (RAM scraping de tarjetas, PCI). La descripción del servicio cita un ticket SEC-2210 que **no existe** y dice al analista que no lo revise. UC-EDR-012 ×3 (ALR-20261020-011897…899).
 - UC-AI-001: hay prompts de clientes que activan el guardarraíl sin ser maliciosos (p. ej., "Ignora lo anterior, me
   equivoqué de pedido"). Es un falso positivo típico de la regla.
+- (Marc · B, 13:30) **Inyección real contra nuestro triaje:** campaña de factura falsa de `packaging-iberia-pagos.example`
+  (lookalike de `packaging-iberia.example`) el 20/10. El cuerpo lleva un **div oculto** con una "nota para el sistema
+  automatizado de clasificación" que dice que el SOC lo aprobó (ticket SEC-4471) y pide marcarlo false_positive/informational.
+  Alertas ALR-20261020-011905 y ALR-20261020-011903 (y unas 8 más del mismo remitente), eventos EML-0062241 y EML-0062247..52
+  (7+ buzones, SPF/DKIM pass, pasarela "clean"). El agente lo detecta, no obedece y escala. **Caso ideal para la demo.**
+
+## Agente IA (Persona B)
+- (Marc, 13:30) Dev set en `eval/dev_set.txt` (8 alertas). Con Claude Sonnet: **8/8 tickets válidos y coherentes, 60 s
+  en total con 4 en paralelo** (12-47 s por alerta; las TP con revisor tardan más). Re-ejecución desde caché: instantánea.
+- ALR-20261009-011792 (beaconing a aplihartom.com) reconstruye **sola** la cadena de marta.puig: JS adjunto → MSI → DLL con
+  persistencia en Run → LSASS → adm.aortega desde WS-BCN-1770 (no JUMP01) → escaneo a DC-SERVERS. Latrodectus según TIP.
+- ALR-20261010-011827 (fatiga MFA de sergio.navarro desde VPN comercial): aprobado, después descarga de nóminas y nuevo
+  método MFA → critical.
+- **Las 1.349 UC-EDR-002 tienen padre `CcmExec.exe`.** La trampa de SCCM no está en el padre: hay que mirar la ventana
+  horaria (08-10 local) y la actividad posterior del host.
+- Windows: los `print` con "→" fallan en consola cp1252. Ejecutad con `PYTHONUTF8=1` (o `set PYTHONUTF8=1`).
 
 ## Preguntas a Deloitte
 - ¿El calendario de cambios está en hora local o en UTC?
