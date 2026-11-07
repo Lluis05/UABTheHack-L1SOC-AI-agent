@@ -55,4 +55,17 @@
 - Limitaciones y próximos pasos (piloto, más fuentes, afinar reglas del SIEM).
 
 ## Lo que no resolvemos (rellenar con honestidad durante la noche)
-- …
+Datos reales medidos contra nuestra verdad del threat hunting (`eval/incidents_truth.jsonl`, 12 incidentes):
+- **Sin IA, la política deja 49 de 83 alertas de ataque "pendientes de IA"** (no las cierra, pero tampoco decide):
+  credential stuffing, túnel DNS de WMS01, AiTM, fuga de nuria.vidal... Necesitan el LLM o una persona.
+- **Si Claude se cae, Gemini gratis no aguanta la defensa:** 5 peticiones/min → solo 2 de 10 alertas con IA en
+  210 s. El resto sale marcado `[SIN IA]` con la decisión de la política (nunca se cierra en silencio).
+- **La correlación encuentra 12/12 incidentes, pero parte dos en piezas:** Logisoft (la VPN robada y el túnel DNS
+  desde WMS01 no comparten ninguna entidad; la relación "Logisoft solo accede a WMS01" es conocimiento de negocio) y
+  la tienda T07 (AnyDesk en el portátil y el RAM scraping en los TPV no comparten IOC). Un analista las une; el código no.
+- **1 incidente falso de 14** (dos alertas de ruido del mismo usuario en 2 días).
+- **Señuelos con lista fija:** los servicios DNS legítimos (ESET, McAfee, Spamhaus, Sophos) e infraestructura (DCs,
+  NESSUS01, pentest) están en una lista en el código. En otra empresa habría que mantenerla.
+- **La cuenta de nuria.vidal sigue activa** con actividad en su puesto después de su último día (16/10): lo vemos,
+  pero ninguna regla lo detecta.
+- **Las etiquetas son nuestras:** la verdad la ha construido el equipo con threat hunting; Deloitte no da las respuestas.

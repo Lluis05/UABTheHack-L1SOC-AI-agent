@@ -252,6 +252,21 @@ Campos extra que añade el agente al ticket (todos opcionales para quien los lea
  "first_seen":"...","last_seen":"...","kill_chain":[{"time":"...","tactic":"...","alert_id":"...","what":"..."}],
  "summary":"...","severity":"high"}
 ```
+**Correlación ✅ (Persona D, `soc/correlate/incidents.py`):**
+```python
+from soc.correlate.incidents import correlate, attach
+incidents = correlate(alerts, store, tickets=tickets)   # alertas NO cerradas → [Incident] del más grave al menos
+inc_id = attach(alert, incidents, store)                 # en vivo: incidente al que se une (→ x_incident_id) o None
+```
+Campos extra: `linking_entities` (qué une las alertas), `x_why` (por qué es incidente y no ruido), `x_chain` y
+`x_tactics` (cadena de ≥ 2 fases → severidad +1, política §5). CLI: `python -m soc.correlate.incidents [--truth]`
+(usa `output/tickets_all_nollm.jsonl` de `python -m soc.pipeline --all --no-llm --out output/tickets_all_nollm.jsonl`).
+
+**Informe de nivel 3 ✅ (Persona D, `soc/correlate/investigate.py`):** `investigate(incident, store) -> report` con el
+esquema `informe_incidente.schema.json`. `incident_id`/`alert_ids` los pone el código, los `event_id` de la
+cronología se validan contra la evidencia y `containment_plan[].approver` lo decide `soc.policy.approvals`. Sin IA →
+informe mínimo con `x_no_ai: true`. CLI: `python -m soc.correlate.investigate --top 3` guarda cada informe en
+`output/reports/<INC>.json` y en `x_report` del incidente en `output/incidents.jsonl` (lo lee el dashboard).
 
 ## Modo defensa en directo (REQUISITO DE DISEÑO PRINCIPAL)
 En la defensa nos dan **10 alertas al azar** y el sistema las tiene que triar **en directo**, delante del jurado.

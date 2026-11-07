@@ -176,7 +176,7 @@ Eres el camino crítico: B y C dependen de tu A3.
 y construir la correlación que los encuentre automáticamente (niveles 2 y 3).
 **Rama:** `feat/correlate`. **Módulos:** `soc/correlate/`, `eval/labels_dev.jsonl`, `eval/incidents_truth.jsonl`, `eval/hunt/`.
 
-### D1 · Threat hunting manual (12:45 → 15:00)
+### D1 · Threat hunting manual (12:45 → 15:00) ✅ HECHO (12 incidentes, ver docs/09)
 - **Qué:** con tu Claude y scripts de análisis de solo lectura (`eval/hunt/*.py`), buscar los incidentes escondidos.
   Pistas de `docs/03` por las que empezar:
   - **nuria.vidal** (se va a un competidor el 16/10): DLP, subidas a la nube, consultas SQL al CRM, correo externo.
@@ -192,14 +192,14 @@ y construir la correlación que los encuentre automáticamente (niveles 2 y 3).
 - **Prompt:** *"Haz D1: threat hunting de solo lectura sobre el dataset de DATASET_DIR. Empieza por las pistas de docs/10.
   Para cada incidente que encuentres dame alert_ids, event_ids clave y la cronología."*
 
-### D2 · Etiquetas de evaluación (15:00 → 17:30)
+### D2 · Etiquetas de evaluación (15:00 → 17:30) ✅ HECHO: las 138 alertas del escenario (`python -m eval.hunt.truth`)
 - **Archivos:** `eval/labels_dev.jsonl`.
 - **Qué:** etiquetar a mano unas **40 alertas** de la muestra de desarrollo, repartidas entre reglas, más las alertas de los
   incidentes de D1. Formato: `{"alert_id", "verdict", "severity", "escalate", "reason", "incident_id"}`.
   Aplicar la matriz de `docs/03` a mano (o con `soc/policy/severity.py` cuando lo tenga A).
 - **Terminado cuando:** B puede ejecutar `evaluate.py` con estas etiquetas.
 
-### D3 · Correlación en incidentes (17:30 → 22:00) — nivel 2
+### D3 · Correlación en incidentes (17:30 → 22:00) — nivel 2 ✅ HECHO: 12/12, 1 falso de 14
 - **Archivos:** `soc/correlate/incidents.py`.
 - **Qué:**
   - Grafo de alertas que comparten entidades (usuario, host, IP externa, dominio, hash, message_id) dentro de una ventana
@@ -211,14 +211,14 @@ y construir la correlación que los encuentre automáticamente (niveles 2 y 3).
 - **Terminado cuando:** **encuentra automáticamente los incidentes de `eval/incidents_truth.jsonl`**. Medir cuántos
   encuentra y cuántas alertas sobran o faltan.
 
-### D4 · Investigación nivel 3 (22:00 → 02:00)
+### D4 · Investigación nivel 3 (22:00 → 02:00) ✅ v1 (`python -m soc.correlate.investigate --top 3`)
 - **Archivos:** `soc/correlate/investigate.py`.
 - [ ] Para incidentes escalados: un prompt LLM (con `soc.llm.complete`) que redacte el informe según
   `informe_incidente.schema.json` (origen, alcance, cronología y relación con otros incidentes) a partir de las
   alertas, el contexto y los logs de las entidades a lo largo de los días.
 - [ ] Guardarlo en `output/incidents.jsonl` para que C lo muestre.
 
-### D5 · Honestidad y apoyo a la demo (02:00 → 06:00)
+### D5 · Honestidad y apoyo a la demo (02:00 → 06:00) 🟡 "Lo que no resolvemos" escrito; falta el caso estrella con C
 - [ ] Redactar "Lo que no resolvemos" en `docs/08_demo_y_pitch.md` con datos reales: incidentes que no encontramos,
   errores típicos y limitaciones.
 - [ ] Preparar con C el caso estrella de la demo: un incidente multi-día reconstruido de principio a fin.

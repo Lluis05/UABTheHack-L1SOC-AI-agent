@@ -29,6 +29,43 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
   aceptable y vigilar los EDR-002 con **otro padre** (Office, explorer, wscript…): esos son los sospechosos.
 - UC-EML-001: newsletters legítimas reportadas como phishing (p. ej., `news.zalando.example`).
 
+## Threat hunting de D (Marc) — la verdad del dataset ✅
+**Pista clave:** los alert_id del escenario tienen numeración **≥ 011785** (salto de 10923 a 11785). Son 138 alertas:
+**83 de 12 incidentes reales + 55 señuelos benignos**. El resto (10.923) es ruido de fondo. Todo en
+`eval/incidents_truth.jsonl` y `eval/labels_dev.jsonl` (generados por `python -m eval.hunt.truth`).
+
+| ID | Sev | Alertas | Incidente |
+|---|---|---|---|
+| INC-01 | critical | 11 | marta.puig: ZIP con .js → Latrodectus → Cobalt Strike → LSASS (adm.aortega) → PsExec FS01 → shadow copies → 18/10 svc_print_upd en Domain Admins + EDR detenido en PRINT01 |
+| INC-02 | critical | 5 | BEC: AiTM a laura.ferrer2 (203.0.113.45) → regla de buzón → IBAN lituano 148.320 € a jordi.serra2 |
+| INC-03 | high | 2 | Minero XMR en JENKINS-DEV01 (CVE-2024-23897) |
+| INC-04 | critical | 16 | Credential stuffing (4 oleadas) → 12 cuentas de clientes → email a tempmail-box → tarjetas regalo |
+| INC-05 | high | 3 | Vela: C700675 (198.19.95.151) intenta leer pedidos de C712944; se revelan códigos internos |
+| INC-06 | critical | 2 | Fatiga MFA de sergio.navarro → descarga de nóminas (el "viaje imposible" es el atacante) |
+| INC-07 | high | 18 | Logisoft desde 77.90.185.20 de madrugada + túnel DNS TXT de WMS01 a cdn-wms-metrics.example |
+| INC-08 | critical | 2 | Spraying desde Tor → svc_backup (sin MFA) → reconocimiento en BACKUP01 y `\\FS01\Finanzas$` |
+| INC-09 | critical | 4 | Dependency confusion (#1842) → claves AWS → backup-sync admin → 112 GB de copias del CRM |
+| INC-10 | critical | 2 | nuria.vidal (se va a la competencia): CRM a mega.nz + 41.200 emails a su correo personal |
+| INC-11 | critical | 5 | T07: AnyDesk desde Marruecos → RAM scraping en 3 TPV (descripción con SEC-2210 falso) → beaconing |
+| INC-12 | high | 13 | Campaña Packaging Iberia con prompt injection oculta; lucia.castro pierde la sesión (AiTM) |
+
+**Señuelos (todos con cambio, viaje o flujo aprobado que encaja en origen, cuenta, ventana y alcance):** pentest
+CHG-1042 (20), Nessus los miércoles (19), PsExec de adm.dnavarro en CHG-1057 (4), viaje de ricard.castells (1),
+nóminas FLUJO-0007 (2), OT vía JUMP01 en CHG-1063 (1), Backup Operators CHG-1078 (1), EDR parado en CHG-1080 (6),
+Logisoft en CHG-1071 (1).
+
+**Resultados medidos:**
+- Política sola (`python -m eval.evaluate --run --mode no_llm`): 0 ataques cerrados como benignos, 0 falsas alarmas,
+  55/55 señuelos cerrados bien, pero 49/83 TP quedan "pendientes de IA".
+- Correlación (`python -m soc.correlate.incidents --truth`): **12/12 incidentes encontrados, 14 incidentes en total
+  (1 falso)** a partir de las 5.630 alertas que la política no cierra. Ver límites en `docs/08` ("Lo que no resolvemos").
+- Informe de nivel 3 de la intrusión (`python -m soc.correlate.investigate --ids INC-0004`, 67 s, Sonnet): 15 hitos
+  con event_id reales y 0 inventados. **Hallazgo nuevo:** el mismo binario (hash 70aa203e…) ya corría en **PRINT01 el
+  10/10 a las 00:51** (EDR-0123435), vía PsExec con adm.aortega. PRINT01 llevaba 8 días comprometido antes del alta
+  en Domain Admins del 18/10.
+- **Para A (política):** los UC-NET-006 a `*.e5.sk`, `avqs.mcafee.com`, `dnsbl.spamhaus.org` y `sophosxl.net` son
+  consultas legítimas de antivirus y antispam (dominios de años, decenas de equipos): se podrían cerrar como FP.
+
 ## Incidentes sospechosos (por investigar)
 - (Lluis 14:00) **Cadena con adm.aortega (probablemente LA intrusión principal):** PsExec WS-BCN-1770 → FS01 con adm.aortega (10/10, 02:42 local, sin cambio) → 18/10 03:13 local: alta de `svc_print_upd` (creada 1 min antes) en **Domain Admins** desde PRINT01 → 18/10 03:22: `sc.exe stop EDRAgentSvc` en PRINT01 lanzado por `spoolhlp.exe` sin firma. Relacionado con el LSASS en WS-BCN-1770 (marta.puig) y el ZIP con .js del 09/10.
 - (Lluis 14:00) **Logisoft comprometido:** ext.logisoft entra por VPN desde **77.90.185.20 (Limited Network LTD)** de madrugada (11/10 03:38, 14/10 01:35…), con TOTP aprobado. Lo habitual es 198.18.240.10. 6 alertas UC-VPN-001.
