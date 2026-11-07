@@ -17,7 +17,7 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
 
 ## Organización: leer las alertas de la API (Discord, 15:50)
 - Pregunta: ¿leer `alertas_muestra_desarrollo.jsonl` o hacer curl a `mock_soc_api`? Respuesta de Deloitte: **"Mejor usar la API"**.
-- **Actualización:** en la defensa nos darán **un JSON** con las alertas, y podemos usar la API o ese JSON.
+- **Actualización:** en la defensa nos darán **un JSON** con las alertas, y podemos usar la API o ese JSON. **Confirmado: mismo formato que `03_alertas/*.jsonl` del GitHub de Deloitte** (JSONL, una alerta por línea) — probado con `alertas_muestra_desarrollo.jsonl`: 150/150.
   - `python -m soc.pipeline --file alertas.json --live` o subirlo/pegarlo en el dashboard. Se acepta cualquier forma: array, objeto suelto, pretty-printed, JSONL, objetos concatenados, envoltorio `{"alerts":[…]}`/`{"items":[…]}` (formato de la API), con BOM; lo ilegible se salta con aviso (`tests/test_robustness.py`, 12 formatos).
   - Aunque las alertas vengan del JSON, si la API está levantada el enriquecimiento la usa de respaldo para lo que no conozcamos.
 - Implementado (Lluis): entrada por la API + enriquecimiento híbrido (índice local y la API como respaldo de lo que no conozcamos). Ver docs/04. Si en la defensa la API trae alertas nuevas que no están en nuestro dataset, se triarán igual.
