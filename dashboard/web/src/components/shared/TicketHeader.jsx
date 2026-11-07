@@ -5,8 +5,8 @@ import { formatSeconds, toPercent } from '../../utils/format.js'
 const DECIDED_FIELDS = [['verdict', 'Veredicto'], ['severity', 'Severidad'], ['actions', 'Acciones'], ['status', 'Estado']]
 
 // Cabecera compacta del ticket: todo en filas horizontales de tags, sin texto explicativo.
-// onAsk: abre el chat con la IA sobre el ticket (pestaña «Chat IA» del modal).
-export default function TicketHeader({ ticket: t, onExpand, onAsk, onClose }) {
+// onAsk: abre o cierra el chat con la IA sobre el ticket (panel lateral). chatOpen: si está abierto.
+export default function TicketHeader({ ticket: t, onExpand, onAsk, chatOpen = false, onClose }) {
   const decided = t.x_decided_by || {}
   return (
     <AppCard>
@@ -33,7 +33,8 @@ export default function TicketHeader({ ticket: t, onExpand, onAsk, onClose }) {
           ))}
           <AppStack direction="row" gap={1} grow justify="flex-end">
             {onAsk ? (
-              <AppButton variant="link" onClick={onAsk} startIcon={<AppIcon name="chat" tone="llm" />}>Preguntar a la IA</AppButton>
+              <AppButton variant={chatOpen ? 'primary' : 'link'} aria-pressed={chatOpen} onClick={onAsk}
+                         startIcon={<AppIcon name="chat" tone={chatOpen ? 'inherit' : 'llm'} />}>Preguntar a la IA</AppButton>
             ) : null}
             <AppButton variant="link" onClick={onExpand}>Ver todo</AppButton>
             <AppButton onClick={onClose} aria-label="Cerrar el detalle y volver a la cola completa">Volver a la cola</AppButton>

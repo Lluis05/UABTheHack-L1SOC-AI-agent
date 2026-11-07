@@ -17,9 +17,10 @@ Autor: Marc Cantero (rama `feat/chatbot`). Fecha: 07/11/2026.
 ## Cómo se usa
 
 1. Abre un ticket en la cola (pestaña **Tickets**).
-2. Pulsa **«Preguntar a la IA»** en la cabecera del ticket, o abre **«Ver todo»** y ve a la pestaña **«Chat IA»**.
+2. Pulsa **«Preguntar a la IA»** en la cabecera del ticket. El chat se abre a la derecha en un panel con forma de móvil
+   (1/3 del ancho) y la cola de la izquierda se comprime (severidad, confianza y el inicio del título).
 3. Elige una de las preguntas sugeridas o escribe la tuya (Enter envía, Mayús+Enter salta de línea).
-4. **«Nueva conversación»** borra el historial. La conversación se mantiene al cerrar y reabrir el modal, y se pierde
+4. **«Nueva conversación»** borra el historial. La conversación se mantiene al cerrar y reabrir el panel, y se pierde
    al cambiar de ticket o recargar la página (no se guarda en el servidor).
 
 Requisito: `GEMINI_API_KEY` en `.env` (clave gratuita en https://aistudio.google.com/apikey). Sin clave, el chat
@@ -30,7 +31,7 @@ muestra el error «Falta GEMINI_API_KEY en .env» y el resto del dashboard funci
 ```
 Navegador (React)                          Backend (FastAPI)                         Gemini
 TicketHeader «Preguntar a la IA»
-TicketDetailDialog → pestaña «Chat IA»
+QueuePage → AppPhonePanel (lateral derecho)
   TicketChat (shared) ── useTicketChat ──▶ POST /api/tickets/{id}/chat ──▶ dashboard/chat.py ──▶ generate_content
    AppChatLog (base)    historial en         {question, history}           ticket + traza      (multi-turno,
                         el navegador         ◀── {answer, model}            en <untrusted_data>  sin herramientas)
@@ -46,7 +47,7 @@ TicketDetailDialog → pestaña «Chat IA»
 | Lógica pura | `web/src/utils/chat.js` (+ `chat.test.js`) | `toHistory`, `canSend` |
 | Base | `web/src/components/base/AppChatLog.jsx` | Log de mensajes con alto fijo y autoscroll (única pieza nueva que toca MUI) |
 | Compuesto | `web/src/components/shared/TicketChat.jsx` | Sugerencias, log, campo de pregunta, botones |
-| Integración | `TicketDetailDialog.jsx` (pestaña `chat`), `TicketHeader.jsx` (botón), `QueuePage.jsx` (hook en la ficha) |
+| Integración | `AppPhonePanel.jsx` (panel lateral con forma de móvil), `TicketHeader.jsx` (botón), `QueuePage.jsx` (hook y panel en `TicketWorkspace`) |
 
 Respeta la estructura base → shared → pages de `docs/06_setup_y_convenciones.md`: sin cadenas ni números mágicos
 (todo en `constants.js`, `settings.py` y `theme.layout.chatLogHeight`), y la lógica reutilizable tiene tests.

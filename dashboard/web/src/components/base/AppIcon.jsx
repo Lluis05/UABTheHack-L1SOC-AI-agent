@@ -1,6 +1,7 @@
 import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined'
 import BoltOutlined from '@mui/icons-material/BoltOutlined'
 import ChatBubbleOutline from '@mui/icons-material/ChatBubbleOutline'
+import CloseRounded from '@mui/icons-material/CloseRounded'
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined'
 import FilterListRounded from '@mui/icons-material/FilterListRounded'
 import GavelOutlined from '@mui/icons-material/GavelOutlined'
@@ -16,6 +17,7 @@ import TrendingUpRounded from '@mui/icons-material/TrendingUpRounded'
 const ICONS = {
   actions: BoltOutlined,
   chat: ChatBubbleOutline,
+  close: CloseRounded,
   escalation: TrendingUpRounded,
   evidence: ManageSearchRounded,
   expand: OpenInFullRounded,
@@ -30,9 +32,9 @@ const ICONS = {
 }
 
 const SIZES = { small: 18, medium: 22 }
-const TONES = { muted: 'text.secondary', primary: 'primary.main' }
+const TONES = { muted: 'text.secondary', primary: 'primary.main', inherit: 'inherit' }
 
-// size: small | medium. tone: muted | primary | cualquier clave de la paleta (policy, llm...)
+// size: small | medium. tone: muted | primary | inherit (el color del botón) | cualquier clave de la paleta (policy, llm...)
 export default function AppIcon({ name, size = 'small', tone = 'muted' }) {
   const Icon = ICONS[name]
   return <Icon aria-hidden="true" sx={{ fontSize: SIZES[size], color: TONES[tone] ?? `${tone}.main`, flexShrink: 0 }} />

@@ -16,7 +16,6 @@ const FILTER_SELECTS = [
   { key: 'decider', label: 'Responsable', options: optionsFor('decider', [DECIDER.POLICY, DECIDER.LLM, DECIDER.HUMAN]), chip: 'decider' },
   { key: 'pendingClose', label: 'Acciones pendientes', options: [{ value: PENDING_CLOSE, label: PENDING_CLOSE_LABEL }] },
 ]
-const filterValueLabel = (f, value) => (f.chip ? chipProps(f.chip, value).label : f.options.find((o) => o.value === value)?.label)
 
 // Barra de la cola: botón «Filtros» (abre el modal), acceso directo a «Listas para cerrar», filtros activos
 // quitables y recuento. pendingClose: cuántos tickets solo esperan a que el N1 ejecute sus acciones.
@@ -35,8 +34,9 @@ export default function TicketFilters({ filters, onChange, shown, total, pending
         </AppButton>
       ) : null}
       {filters.text.trim() ? <AppChip label={`id: ${filters.text.trim()}`} variant="code" onDelete={clear('text')} /> : null}
-      {FILTER_SELECTS.filter((f) => filters[f.key]).map((f) => (
-        <AppChip key={f.key} label={`${f.label}: ${filterValueLabel(f, filters[f.key])}`} onDelete={clear(f.key)} />
+      {/* «Listas para cerrar» no lleva tag: el botón de la barra ya se ve pulsado */}
+      {FILTER_SELECTS.filter((f) => f.chip && filters[f.key]).map((f) => (
+        <AppChip key={f.key} label={`${f.label}: ${chipProps(f.chip, filters[f.key]).label}`} onDelete={clear(f.key)} />
       ))}
       {active > 0 ? <AppButton variant="link" onClick={() => onChange(EMPTY_FILTERS)}>Quitar filtros</AppButton> : null}
       <AppStack direction="row" grow justify="flex-end">

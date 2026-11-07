@@ -67,8 +67,10 @@ export const theme = createTheme({
     ticketCardMinWidth: 320, ticketCardHeight: 168,
     // Modal de información extendida: alto fijo proporcional a la pantalla
     dialogLgHeight: '80vh',
-    // Chat del ticket dentro de ese modal: lo que queda tras título, pestañas, aviso, campo de pregunta y botones
-    chatLogHeight: 'calc(80vh - 340px)',
+    // Panel del chat con forma de móvil: debajo de la cabecera fija y hasta el borde inferior de la pantalla
+    phoneTop: 112, phoneHeight: 'calc(100vh - 128px)',
+    // Log del chat dentro de ese panel: lo que queda tras muesca, título, aviso, campo de pregunta y botones
+    chatLogHeight: 'calc(100vh - 470px)',
     // Upload: la zona de entrada y el progreso tienen alto fijo (no saltan al cambiar de modo ni al llegar alertas)
     uploadInputHeight: 230, uploadProgressHeight: '45vh',
   },

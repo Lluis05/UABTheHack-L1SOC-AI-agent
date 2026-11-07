@@ -92,19 +92,19 @@ export const PAGES = [
   { value: PAGE.CONTAINMENT, label: 'Acciones' },
 ]
 
-export const APP_TITLE = 'Dashboard de incidencias'
+export const APP_TITLE = 'Tarvia'
 
 // Información extendida del ticket (modal con pestañas): lo que no cabe en la ficha sin hacer scroll
-export const DETAIL_TAB = { SUMMARY: 'summary', EVIDENCE: 'evidence', TRACE: 'trace', HISTORY: 'history', CHAT: 'chat' }
+export const DETAIL_TAB = { SUMMARY: 'summary', EVIDENCE: 'evidence', TRACE: 'trace', HISTORY: 'history' }
 export const DETAIL_TABS = [
   { value: DETAIL_TAB.SUMMARY, label: 'Resumen' },
   { value: DETAIL_TAB.EVIDENCE, label: 'Evidencias' },
   { value: DETAIL_TAB.TRACE, label: 'Consultas' },
   { value: DETAIL_TAB.HISTORY, label: 'Historial' },
-  { value: DETAIL_TAB.CHAT, label: 'Chat IA' },
 ]
 
-// Chat del ticket con Gemini (dashboard/chat.py, docs/12_chatbot.md). Los máximos reales llegan de /api/config.
+// Chat del ticket con Gemini (dashboard/chat.py, docs/12_chatbot.md), en el panel lateral con forma de móvil.
+// Los máximos reales llegan de /api/config.
 export const CHAT_ROLE = { USER: 'user', MODEL: 'model', ERROR: 'error' }
 export const CHAT_DEFAULT_MAX_CHARS = 2000
 export const CHAT_DEFAULT_MAX_TURNS = 12

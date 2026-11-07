@@ -13,7 +13,7 @@ const CHAT_ROLES = {
 const PENDING_TEXT = 'Pensando…'
 
 // Chat con la IA sobre el ticket abierto: preguntas libres + sugerencias. Solo consulta: no cambia nada del ticket.
-// chat: lo que devuelve useTicketChat (vive en la ficha, así la conversación sobrevive al cerrar el modal).
+// chat: lo que devuelve useTicketChat (vive fuera del panel, así la conversación sobrevive al cerrarlo).
 export default function TicketChat({ chat, maxChars = CHAT_DEFAULT_MAX_CHARS }) {
   const [text, setText] = useState('')
   const ready = canSend(text, chat.busy, maxChars)
@@ -50,12 +50,13 @@ export default function TicketChat({ chat, maxChars = CHAT_DEFAULT_MAX_CHARS }) 
       </AppAlert>
       <AppChatLog messages={chat.messages} roles={CHAT_ROLES} pending={chat.busy ? PENDING_TEXT : null}
                   empty={empty} height="chatLogHeight" label="Conversación con la IA sobre el ticket" />
-      <AppStack direction="row" gap={1} align="flex-end">
-        <AppTextField label="Tu pregunta" name="chat-question" value={text} onChange={setText} rows={1}
-                      onKeyDown={onKeyDown} placeholder="¿Por qué se ha cerrado este ticket?"
-                      inputProps={{ maxLength: maxChars }} autoComplete="off" />
-        <AppButton variant="primary" onClick={() => send()} disabled={!ready}>Enviar</AppButton>
+      {/* Panel estrecho (forma de móvil): campo a todo el ancho y botones debajo */}
+      <AppTextField label="Tu pregunta" name="chat-question" value={text} onChange={setText} rows={1}
+                    onKeyDown={onKeyDown} placeholder="¿Por qué se ha cerrado este ticket?"
+                    inputProps={{ maxLength: maxChars }} autoComplete="off" />
+      <AppStack direction="row" gap={1} justify="flex-end">
         {chat.messages.length ? <AppButton onClick={chat.reset} disabled={chat.busy}>Nueva conversación</AppButton> : null}
+        <AppButton variant="primary" onClick={() => send()} disabled={!ready}>Enviar</AppButton>
       </AppStack>
     </AppStack>
   )
