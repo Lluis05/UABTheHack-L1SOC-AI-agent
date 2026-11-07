@@ -20,7 +20,7 @@ Marca los checkbox según avances (edita este archivo y haz commit) para que el 
 - [ ] `cp .env.example .env`. Comprobar que `DATASET_DIR` apunta al dataset. Poner `GEMINI_API_KEY` (gratis en https://aistudio.google.com/apikey).
 - [ ] `claude` (login) y luego `python -m soc.llm`. Tiene que imprimir un veredicto en JSON.
 - [ ] Leer **15 min**: `docs/01_reto.md`, `docs/03_politica_y_contexto.md` y los contratos de `docs/04_arquitectura.md`.
-- [ ] Crear tu rama: `git checkout -b feat/<tu-modulo>`.
+- [ ] Crear tu rama: A → `feat/data`, B → `feat/agent`, C → `feat/dashboard`. Seguir el **flujo obligatorio** de `docs/06_setup_y_convenciones.md` (nunca commits directos a `main`).
 - [ ] Arrancar tu Claude con:
   > Lee CLAUDE.md y todo docs/. Soy la Persona X (ver docs/10_paso_a_paso.md). Vamos a hacer mis pasos en orden.
   > Trabaja solo en mis módulos y respeta los contratos de docs/04_arquitectura.md. No añadas Co-Authored-By en los commits.
@@ -163,7 +163,7 @@ Eres el camino crítico: B y C dependen de tu A3.
 
 ---
 
-## PERSONA C · Dashboard, contención y presentación
+## PERSONA C · Dashboard, contención y presentación — Adrián
 **Misión:** que el jurado *vea* cómo la IA hace el triaje y dónde decide la persona. Esto es lo que van a evaluar visualmente.
 
 ### C1 · Esqueleto con datos falsos (12:45 → 14:00)
