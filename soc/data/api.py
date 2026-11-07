@@ -28,12 +28,16 @@ from typing import Any
 
 from soc import config
 from soc.data.store import EVENT_PREFIX, DataStore
+from soc.timeutil import window
 
 log = logging.getLogger(__name__)
 
 TIMEOUT_S = float(os.getenv("SOC_API_TIMEOUT", "3"))
 LOGS_TIMEOUT_S = float(os.getenv("SOC_API_LOGS_TIMEOUT", "15"))   # /logs recorre el fichero entero
 MAX_FALLBACK_CALLS = int(os.getenv("SOC_API_MAX_CALLS", "25"))   # por alerta
+ALERT_BUDGET_S = float(os.getenv("SOC_API_ALERT_BUDGET", "8"))   # segundos de API por alerta como máximo
+MAX_LOG_LOOKUPS = int(os.getenv("SOC_API_MAX_LOG_LOOKUPS", "4"))  # /logs es lo caro: recorre el fichero
+LOG_WINDOW_H = 24
 HEALTH_TTL_S = 30
 _HEALTH: dict[str, tuple[float, bool]] = {}  # por URL: una API caída no se re-comprueba en cada alerta
 
@@ -108,11 +112,20 @@ class SocApi:
     def sandbox(self, sha256: str) -> dict | None:
         return self._get(f"/sandbox/{self._seg(sha256)}")
 
-    def event(self, event_id: str) -> dict | None:
+    def event(self, event_id: str, around: str | None = None) -> dict | None:
+        """Busca un evento por id. Con `around` (ISO) se acota a ±24 h: la API se salta el resto del fichero sin
+        serializarlo, que es lo que hace lenta la búsqueda de texto."""
         src = EVENT_PREFIX.get(str(event_id).split("-", 1)[0])
         if not src:
             return None
-        res = self._get(f"/logs/{src}", {"q": event_id, "limit": 5}, timeout=LOGS_TIMEOUT_S) or {}
+        params = {"q": event_id, "limit": 5}
+        if around:
+            try:
+                st, en = window(around, LOG_WINDOW_H)
+                params.update(desde=st, hasta=en)
+            except (ValueError, TypeError):
+                pass
+        res = self._get(f"/logs/{src}", params, timeout=LOGS_TIMEOUT_S) or {}
         e = next((x for x in res.get("items") or [] if x.get("event_id") == event_id), None)
         return {**e, "_source": src} if e else None
 
@@ -129,15 +142,30 @@ class HybridStore:
         return getattr(self.local, name)
 
     # --------------------------------------------------------- traza de API
-    def begin(self) -> None:
-        """Empieza a registrar las llamadas a la API de una alerta."""
+    def begin(self, alert_ts: str | None = None) -> None:
+        """Empieza a registrar las llamadas a la API de una alerta (presupuesto de llamadas y de tiempo)."""
         self._tl.calls, self._tl.budget = [], MAX_FALLBACK_CALLS
+        self._tl.deadline = time.perf_counter() + ALERT_BUDGET_S
+        self._tl.logs_left = MAX_LOG_LOOKUPS
+        self._tl.ts = alert_ts
+        self._tl.exhausted = False
 
     def api_calls(self) -> list[dict]:
         return list(getattr(self._tl, "calls", []))
 
     def _fallback(self, kind: str, key: str, fn) -> Any:
         if not self.api or getattr(self._tl, "budget", MAX_FALLBACK_CALLS) <= 0 or not self.api.available():
+            return None
+        if kind == "logs":
+            if getattr(self._tl, "logs_left", MAX_LOG_LOOKUPS) <= 0:
+                return None
+            self._tl.logs_left = getattr(self._tl, "logs_left", MAX_LOG_LOOKUPS) - 1
+        if time.perf_counter() > getattr(self._tl, "deadline", float("inf")):
+            calls = getattr(self._tl, "calls", None)
+            if calls is not None and not getattr(self._tl, "exhausted", False):
+                self._tl.exhausted = True
+                calls.append({"step": "api_budget", "query": f"{ALERT_BUDGET_S:.0f} s", "ms": 0, "source": "API SOC",
+                              "result": "presupuesto de tiempo de la API agotado: se sigue con lo que hay"})
             return None
         self._tl.budget = getattr(self._tl, "budget", MAX_FALLBACK_CALLS) - 1
         t0 = time.perf_counter()
@@ -157,7 +185,8 @@ class HybridStore:
         return self.local.alert(alert_id) or self._fallback("alert", alert_id, self.api.alert if self.api else None)
 
     def event(self, event_id: str) -> dict | None:
-        return self.local.event(event_id) or self._fallback("logs", event_id, self.api.event if self.api else None)
+        return self.local.event(event_id) or self._fallback(
+            "logs", event_id, (lambda e: self.api.event(e, getattr(self._tl, "ts", None))) if self.api else None)
 
     def asset(self, key: str) -> dict | None:
         return self.local.asset(key) or self._fallback("cmdb", key, self.api.asset if self.api else None)

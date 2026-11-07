@@ -22,6 +22,13 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
   - Aunque las alertas vengan del JSON, si la API está levantada el enriquecimiento la usa de respaldo para lo que no conozcamos.
 - Implementado (Lluis): entrada por la API + enriquecimiento híbrido (índice local y la API como respaldo de lo que no conozcamos). Ver docs/04. Si en la defensa la API trae alertas nuevas que no están en nuestro dataset, se triarán igual.
 
+## Alertas NUEVAS por el dashboard con la API levantada (Lluis 17:00)
+- Prueba: 10 alertas con el formato del GitHub pero ids, fechas y `related_events` inventados.
+- **Problema encontrado:** preparar el contexto tardaba **118 s** (antes de la IA): por cada evento desconocido se preguntaba a `/logs?q=` de la API, que recorre y serializa el fichero entero (5-8 s por consulta), y las alertas iban una a una.
+- **Arreglo:** búsqueda acotada a ±24 h de la alerta, máx. 4 búsquedas de logs y 8 s de API por alerta (queda en la traza si se agota) y contexto en paralelo en modo live → **11,6 s**.
+- Prueba real por el dashboard (3 alertas nuevas, Claude real): 40,8 s, 3 tickets; 2 con IA (que señala los eventos que faltan como preguntas abiertas) y 1 sin IA porque **se agotó el límite de uso de Claude** en ese momento → ticket de la política marcado "IA no disponible". Riesgo real para la defensa: llegar con cuota.
+- El backend del dashboard fue cerrado por **memoria baja** (DataStore ~2 GB + API de Deloitte + otros procesos). En la defensa: cerrar todo lo que no haga falta.
+
 ## Métricas del batch completo (`--all --no-llm`, Lluis 16:00)
 - 11.061 alertas → 10.972 tickets (89 duplicados agrupados) en ~36 s (~300 alertas/s).
 - **86,9 % decididas por la política** sin IA; 5.384 cerradas automáticamente; 1.434 pendientes de IA (220 con severidad potencial high/critical, que se escalan a una persona).

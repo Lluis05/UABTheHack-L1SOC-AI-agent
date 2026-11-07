@@ -194,14 +194,13 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
     # En directo nunca se reutilizan respuestas: el jurado debe ver a la IA razonar cada alerta
     use_cache = (mode != "live") if use_cache is None else use_cache
 
-    # 1-3 · contexto + política + prefiltro (determinista, ms)
-    contexts, hints = [], {}
-    for a in alerts:
+    # 1-3 · contexto + política + prefiltro (determinista, ms; con la API de respaldo, segundos)
+    def prepare(a: dict) -> tuple[dict, dict | None]:
         aid = a.get("alert_id", "?")
         step(aid, "context", {"message": "recopilando contexto (CMDB, directorio, logs ±24 h, TIP, cambios…)"})
         try:
             if hybrid:
-                hybrid.begin()
+                hybrid.begin(a.get("created_at"))
             ctx = build_context(a, hybrid or store)
             intake = a.get("x_intake")
             extra = ([{"step": "intake", "query": aid, "result": f"alerta leída de: {intake}", "ms": 0,
@@ -217,11 +216,19 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
         sev = ctx.get("severity") or {}
         sug = sev.get("suggestion") or {}
         hint = prefilter(ctx)
-        hints[aid] = hint
         step(aid, "policy", {"message": f"política: {len(ctx.get('policy_hits') or [])} reglas · severidad "
                                         f"{sev.get('final')} · sugiere {sug.get('verdict') or '—'}"
                                         f"{' (concluyente)' if hint and hint.get('decisive') else ''}"})
-        contexts.append(ctx)
+        return ctx, hint
+
+    if hybrid and len(alerts) > 1:
+        # Con la API de respaldo cada alerta puede esperar a la red: se preparan en paralelo
+        with cf.ThreadPoolExecutor(max_workers=min(len(alerts), CONTEXT_WORKERS)) as pool:
+            prepared = list(pool.map(prepare, alerts))
+    else:
+        prepared = [prepare(a) for a in alerts]
+    contexts = [c for c, _ in prepared]
+    hints = {(c.get("alert") or {}).get("alert_id", "?"): h for c, h in prepared}
 
     groups = dedup_groups(contexts) if dedup else [[c] for c in contexts]
     out_by_rep: dict[str, dict] = {}
@@ -260,6 +267,7 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
 
 
 ALERT_TIMEOUT_S = int(os.getenv("ALERT_TIMEOUT", "150"))
+CONTEXT_WORKERS = int(os.getenv("CONTEXT_WORKERS", "10"))
 _AGENT_STEP = {"ia": "llm", "revisor": "reviewer"}
 
 
