@@ -1,0 +1,60 @@
+"""Configuración y constantes del dashboard (un único sitio para rutas, límites y valores del contrato)."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+try:  # .env opcional; se carga aquí para que todos los módulos vean las mismas variables
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
+ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", ROOT / "output")).resolve()
+SAMPLE_DIR = (ROOT / "dashboard" / "sample").resolve()
+WEB_DIST = (ROOT / "dashboard" / "web" / "dist").resolve()
+
+TICKETS_FILE = "tickets.jsonl"
+INCIDENTS_FILE = "incidents.jsonl"
+BATCH_METRICS_FILE = "metrics.json"
+DECISIONS_FILE = OUTPUT_DIR / "human_decisions.jsonl"
+LIVE_INPUT_DIR = OUTPUT_DIR / "live_input"
+TRACES_DIR = "traces"
+
+SOC_API_URL = os.getenv("SOC_API_URL", "http://localhost:8000").rstrip("/")
+SOC_API_TIMEOUT_S = 10
+
+# Solo para desarrollar la UI sin pipeline: los tickets salen marcados como simulados.
+SIMULATE = os.getenv("DASHBOARD_SIMULATE", "0") == "1"
+
+MINUTES_PER_ALERT_MANUAL = 15  # referencia del reto: ~15 min por alerta hecha a mano
+LIVE_TARGET_SECONDS = 120      # objetivo de la defensa: 10 alertas en menos de 2 min
+MAX_LIVE_ALERTS = 50
+LIVE_LOG_TAIL = 200
+
+# Valores del contrato Ticket (docs/04)
+STATUS_TRIAGED = "triaged"
+STATUS_AWAITING = "awaiting_approval"
+STATUS_CLOSED = "closed"
+STATUS_ESCALATED = "escalated"
+DECIDER_POLICY = "policy"
+DECIDER_HUMAN = "human"
+DECIDER_SIMULATED = "simulated"
+
+# Decisiones humanas sobre el estado y a qué x_status llevan
+DECISION_CONTAINMENT = "containment"
+STATUS_BY_DECISION = {"close": STATUS_CLOSED, "escalate": STATUS_ESCALATED, "reopen": STATUS_TRIAGED}
+VERDICTS = ("true_positive", "benign_true_positive", "false_positive", "needs_more_info")
+
+# Pasos del triaje en vivo (docs/04, "Modo defensa en directo")
+STEP_QUEUED = "queued"
+STEP_TICKET = "ticket"
+STEP_ERROR = "error"
+LIVE_STEPS = ("context", "policy", "llm", "reviewer", STEP_TICKET)
+
+LIVE_MODE_INPROCESS = "inprocess"
+LIVE_MODE_SUBPROCESS = "subprocess"
+LIVE_MODE_SIMULATED = "simulated"
+LIVE_MODE_NONE = "none"

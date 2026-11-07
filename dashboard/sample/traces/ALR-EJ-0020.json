@@ -1,0 +1,34 @@
+{
+ "trace": [
+  {
+   "step": "alert_load",
+   "query": "ALR-EJ-0020",
+   "result": "found",
+   "ms": 1
+  },
+  {
+   "step": "injection_scan",
+   "query": "subject",
+   "result": "instrucciones detectadas",
+   "ms": 1
+  },
+  {
+   "step": "sandbox",
+   "query": "sha256 del adjunto",
+   "result": "malicious",
+   "ms": 2
+  },
+  {
+   "step": "llm_triage",
+   "query": "claude_code",
+   "result": "timeout",
+   "ms": 60000
+  },
+  {
+   "step": "llm_triage",
+   "query": "gemini (fallback)",
+   "result": "true_positive (0.80)",
+   "ms": 9800
+  }
+ ]
+}

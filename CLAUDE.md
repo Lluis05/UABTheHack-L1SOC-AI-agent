@@ -29,5 +29,8 @@ Equipo de 4 personas, cada una con su propio Claude. **Entrega: domingo 8 de nov
 - **Cuota LLM:** usamos la suscripción de Claude Code (+ Gemini gratis de fallback). No lances el LLM sobre las
   11.061 alertas. Usa la muestra de 150 y el prefiltro determinista (ver `docs/07_llm.md`).
 - Código en Python 3.11, comentarios y docs en castellano, nombres de variables en inglés.
+- **Principios de código y estructura del frontend (React + Material UI, base → shared → pages):** obligatorios,
+  ver `docs/06_setup_y_convenciones.md` → "Principios de código". Reutiliza antes de crear, sin cadenas ni números
+  mágicos, la lógica reutilizable lleva tests.
 - Si descubres algo importante del dataset (una trampa, un incidente, un patrón), añádelo a
   `docs/09_hallazgos.md` para que el resto del equipo lo sepa.

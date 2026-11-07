@@ -1,0 +1,70 @@
+{
+ "trace": [
+  {
+   "step": "alert_load",
+   "query": "ALR-EJ-0010",
+   "result": "found",
+   "ms": 1
+  },
+  {
+   "step": "user_lookup",
+   "query": "m.garcia@tarvia.example",
+   "result": "found, Finanzas",
+   "ms": 2
+  },
+  {
+   "step": "hr_events",
+   "query": "m.garcia",
+   "result": "sin viajes",
+   "ms": 1
+  },
+  {
+   "step": "asset_lookup",
+   "query": "WS-BCN-0932",
+   "result": "found (Alta)",
+   "ms": 3
+  },
+  {
+   "step": "logs_search",
+   "query": "m.garcia ±24h",
+   "result": "email 3, proxy 12, signin 4, erp 2",
+   "ms": 160
+  },
+  {
+   "step": "geoip",
+   "query": "203.0.113.50",
+   "result": "hosting NL",
+   "ms": 2
+  },
+  {
+   "step": "intel",
+   "query": "203.0.113.50",
+   "result": "sin coincidencias en TIP",
+   "ms": 3
+  },
+  {
+   "step": "other_alerts",
+   "query": "m.garcia",
+   "result": "ALR-EJ-0011, ALR-EJ-0014",
+   "ms": 6
+  },
+  {
+   "step": "severity_matrix",
+   "query": "medium × Alta (+1 −1)",
+   "result": "high",
+   "ms": 0
+  },
+  {
+   "step": "llm_triage",
+   "query": "claude_code",
+   "result": "true_positive (0.86)",
+   "ms": 17200
+  },
+  {
+   "step": "reviewer",
+   "query": "4 afirmaciones",
+   "result": "4/4 con event_id",
+   "ms": 1100
+  }
+ ]
+}

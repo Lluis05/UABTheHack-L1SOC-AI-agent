@@ -63,7 +63,7 @@ Un agente que hace el trabajo de un analista L1 de punta a punta y entrega a L2 
 - **Orquestación del agente:** pipeline propio en Python con salida estructurada (JSON Schema)
 - **Enriquecimiento:** VirusTotal, AbuseIPDB, MITRE ATT&CK (STIX)
 - **API del SOC:** mock_soc_api (FastAPI) proporcionada por Deloitte
-- **Dashboard:** Streamlit
+- **Dashboard:** React + Vite (frontend) y FastAPI (backend en `dashboard/server.py`)
 - **Datos:** índices en memoria sobre el dataset de Deloitte + API simulada para contención
 
 > Detalles en [docs/04_arquitectura.md](docs/04_arquitectura.md).
@@ -86,7 +86,7 @@ Para trabajar con Claude Code, ver [`CLAUDE.md`](CLAUDE.md).
 │   ├── triage/         # Prefiltro determinista, agente LLM, revisor
 │   ├── correlate/      # Agrupación en incidentes y cadena de ataque
 │   └── pipeline.py     # Orquestación y CLI
-├── dashboard/          # Streamlit: cola, traza, evidencias, aprobación humana
+├── dashboard/          # React + FastAPI: cola, traza, evidencias, aprobación humana, triaje en vivo
 ├── eval/               # Etiquetas manuales y métricas
 └── docs/               # Documentación del equipo
 ```

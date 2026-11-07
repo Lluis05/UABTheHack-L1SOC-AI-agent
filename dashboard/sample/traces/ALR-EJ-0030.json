@@ -1,0 +1,34 @@
+{
+ "trace": [
+  {
+   "step": "alert_load",
+   "query": "ALR-EJ-0030",
+   "result": "found",
+   "ms": 1
+  },
+  {
+   "step": "asset_lookup",
+   "query": "WS-ZAR-0417",
+   "result": "found (Media)",
+   "ms": 2
+  },
+  {
+   "step": "asset_lookup",
+   "query": "10.40.17.23",
+   "result": "PLC-ZAR-03 (Crítica, LOGISTICS-OT)",
+   "ms": 2
+  },
+  {
+   "step": "change_calendar",
+   "query": "WS-ZAR-0417",
+   "result": "sin cambio",
+   "ms": 1
+  },
+  {
+   "step": "policy_rules",
+   "query": "OT_ACCESS_ALLOWLIST",
+   "result": "suspicious",
+   "ms": 0
+  }
+ ]
+}
