@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { ACTION_KIND, INPUT_MODE } from '../config/constants.js'
-import { actionKind, affectedGroups, EMPTY_FILTERS, findExecution, queueTickets } from './tickets.js'
+import { actionKind, affectedGroups, approversLabel, EMPTY_FILTERS, findExecution, queueTickets } from './tickets.js'
 import { alertElapsedSeconds, buildTriageRequest, parseAlerts, parseIds, stepStates, summarizeJob } from './triage.js'
 import { countLabel, formatDateTime, formatPercent, toPercent } from './format.js'
 import { chipProps, optionsFor } from './chips.js'
 import { buildSearch, readUrlState } from './url.js'
 
-const CONFIG = { api_actions: ['isolate_host', 'block_ioc'], no_approval_actions: ['block_ioc'] }
+const CONFIG = { api_actions: ['isolate_host', 'block_ioc'] }
+const rule = (allowed, requires_approval, approvers = []) => ({ allowed, requires_approval, approvers })
 const STEPS = ['context', 'policy', 'llm', 'reviewer', 'ticket']
 
 describe('queueTickets', () => {
@@ -25,11 +26,18 @@ describe('queueTickets', () => {
 })
 
 describe('acciones', () => {
-  it('clasifica según la configuración de la API', () => {
-    expect(actionKind('isolate_host', CONFIG)).toBe(ACTION_KIND.APPROVAL)
-    expect(actionKind('block_ioc', CONFIG)).toBe(ACTION_KIND.N1)
-    expect(actionKind('escalate', CONFIG)).toBe(ACTION_KIND.DECISION)
-    expect(actionKind('isolate_host', null)).toBe(ACTION_KIND.DECISION)
+  it('clasifica según la política (x_approval)', () => {
+    expect(actionKind({ action: 'isolate_host', x_approval: rule(true, true) }, CONFIG)).toBe(ACTION_KIND.APPROVAL)
+    expect(actionKind({ action: 'block_ioc', x_approval: rule(true, false) }, CONFIG)).toBe(ACTION_KIND.N1)
+    expect(actionKind({ action: 'isolate_host', x_approval: rule(false, true) }, CONFIG)).toBe(ACTION_KIND.BLOCKED)
+    expect(actionKind({ action: 'escalate', x_approval: rule(true, false) }, CONFIG)).toBe(ACTION_KIND.DECISION)
+  })
+  it('sin dato de la política, pide aprobación (lo más seguro)', () => {
+    expect(actionKind({ action: 'block_ioc' }, CONFIG)).toBe(ACTION_KIND.APPROVAL)
+  })
+  it('muestra quién aprueba', () => {
+    expect(approversLabel({ x_approval: rule(true, true, ['N2', 'Negocio']) })).toBe('N2 + Negocio')
+    expect(approversLabel({})).toBe('')
   })
   it('encuentra la ejecución por acción y objetivo', () => {
     const executed = [{ action: 'block_ioc', target: '1.2.3.4' }]

@@ -2,13 +2,14 @@ import { AppButton, AppCard, AppChip, AppStack, AppTable, AppText } from '../bas
 import { ACTION_KIND } from '../../config/constants.js'
 import { chipProps } from '../../utils/chips.js'
 import { formatDateTime } from '../../utils/format.js'
-import { actionKind, findExecution } from '../../utils/tickets.js'
+import { actionKind, approversLabel, findExecution } from '../../utils/tickets.js'
 
 // Etiqueta del tipo de acción y texto del botón: el mismo verbo en el botón, el diálogo y el resultado.
 const KIND = {
   [ACTION_KIND.APPROVAL]: { chip: { label: 'Requiere aprobación', tone: 'warning' }, button: 'Aprobar', buttonVariant: 'primary' },
   [ACTION_KIND.N1]: { chip: { label: 'La ejecuta N1' }, button: 'Ejecutar', buttonVariant: 'secondary' },
   [ACTION_KIND.DECISION]: { chip: { label: 'Decisión' } },
+  [ACTION_KIND.BLOCKED]: { chip: { label: 'No permitida', tone: 'error' } },
 }
 const EXECUTED_COLUMNS = [
   { key: 'action', label: 'Acción', mono: true },
@@ -26,29 +27,10 @@ export default function ActionsPanel({ ticket, config, onRequest }) {
     <AppCard title="Acciones recomendadas" action={<AppChip {...chipProps('decider', ticket.x_decided_by?.actions)} />}>
       <AppStack gap={1}>
         {actions.length === 0 ? <AppText tone="muted">No se propone ninguna acción.</AppText> : null}
-        {actions.map((a) => {
-          const kind = actionKind(a.action, config)
-          const done = findExecution(a, executed)
-          return (
-            <AppStack key={`${a.action}-${a.target}`} direction="row" gap={1} wrap>
-              <AppChip label={a.action} variant="code" />
-              <AppChip label={a.target} variant="code" />
-              <AppChip {...KIND[kind].chip} />
-              <AppText variant="caption" tone="muted">{a.justification}</AppText>
-              <AppStack direction="row" grow justify="flex-end">
-                {done ? <AppText variant="strong" tone="success">Ejecutada</AppText> : null}
-                {!done && KIND[kind].button ? (
-                  <AppButton variant={KIND[kind].buttonVariant} onClick={() => onRequest(a, kind)}>
-                    {KIND[kind].button} {a.action}
-                  </AppButton>
-                ) : null}
-                {!done && !KIND[kind].button ? (
-                  <AppText variant="caption" tone="muted">Se decide en «Decisión humana»</AppText>
-                ) : null}
-              </AppStack>
-            </AppStack>
-          )
-        })}
+        {actions.map((a) => (
+          <ActionRow key={`${a.action}-${a.target}`} action={a} kind={actionKind(a, config)}
+                     done={findExecution(a, executed)} onRequest={onRequest} />
+        ))}
         {executed.length > 0 ? (
           <>
             <AppText variant="strong">Ejecutadas</AppText>
@@ -57,5 +39,35 @@ export default function ActionsPanel({ ticket, config, onRequest }) {
         ) : null}
       </AppStack>
     </AppCard>
+  )
+}
+
+function ActionRow({ action: a, kind, done, onRequest }) {
+  const approvers = approversLabel(a)
+  return (
+    <AppStack gap={0.5}>
+      <AppStack direction="row" gap={1} wrap>
+        <AppChip label={a.action} variant="code" />
+        <AppChip label={a.target} variant="code" />
+        <AppChip {...KIND[kind].chip} title={a.x_approval?.note} />
+        {approvers ? (
+          <AppChip label={`${kind === ACTION_KIND.BLOCKED ? 'Escalar a' : 'Aprueba'}: ${approvers}`} tone="policy"
+                   title="Lo decide la política, no la IA" />
+        ) : null}
+        <AppText variant="caption" tone="muted">{a.justification}</AppText>
+        <AppStack direction="row" grow justify="flex-end">
+          {done ? <AppText variant="strong" tone="success">Ejecutada</AppText> : null}
+          {!done && KIND[kind].button ? (
+            <AppButton variant={KIND[kind].buttonVariant} onClick={() => onRequest(a, kind)}>
+              {KIND[kind].button} {a.action}
+            </AppButton>
+          ) : null}
+          {!done && kind === ACTION_KIND.DECISION ? (
+            <AppText variant="caption" tone="muted">Se decide en «Decisión humana»</AppText>
+          ) : null}
+        </AppStack>
+      </AppStack>
+      {kind === ACTION_KIND.BLOCKED ? <AppText variant="caption" tone="error">{a.x_approval.note}</AppText> : null}
+    </AppStack>
   )
 }

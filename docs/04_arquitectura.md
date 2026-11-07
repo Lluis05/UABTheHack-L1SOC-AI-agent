@@ -70,6 +70,7 @@ dashboard/
   settings.py            # constantes y rutas del dashboard
   results.py             # lectura de output/ + decisiones humanas + métricas (con tests)
   live.py                # triaje en directo: motores inprocess/subprocess/simulado (con tests)
+  policy.py              # usa soc/policy/approvals.py (A) para decidir quién aprueba cada acción; carga el DataStore en segundo plano
   containment.py         # cliente de la API simulada (Persona C)
   sample/                # tickets/incidentes/trazas de EJEMPLO con este contrato (se usan si no hay output/)
   web/                   # frontend React + Material UI + Vite (Persona C); base → shared → pages

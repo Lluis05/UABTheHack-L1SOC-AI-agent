@@ -1,18 +1,12 @@
-"""Configuración y constantes del dashboard (un único sitio para rutas, límites y valores del contrato)."""
+"""Constantes del dashboard. Rutas y URLs salen de soc/config.py (fuente única de configuración del proyecto)."""
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
-try:  # .env opcional; se carga aquí para que todos los módulos vean las mismas variables
-    from dotenv import load_dotenv
+from soc import config
 
-    load_dotenv()
-except ImportError:
-    pass
-
-ROOT = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", ROOT / "output")).resolve()
+ROOT = config.REPO_ROOT
+OUTPUT_DIR = config.OUTPUT_DIR
 SAMPLE_DIR = (ROOT / "dashboard" / "sample").resolve()
 WEB_DIST = (ROOT / "dashboard" / "web" / "dist").resolve()
 
@@ -23,7 +17,7 @@ DECISIONS_FILE = OUTPUT_DIR / "human_decisions.jsonl"
 LIVE_INPUT_DIR = OUTPUT_DIR / "live_input"
 TRACES_DIR = "traces"
 
-SOC_API_URL = os.getenv("SOC_API_URL", "http://localhost:8000").rstrip("/")
+SOC_API_URL = config.SOC_API_URL.rstrip("/")
 SOC_API_TIMEOUT_S = 10
 
 # Solo para desarrollar la UI sin pipeline: los tickets salen marcados como simulados.

@@ -35,10 +35,17 @@ export function findExecution(action, executedActions = []) {
   return executedActions.find((e) => e.action === action.action && e.target === action.target)
 }
 
-// Qué puede hacer la persona con una acción recomendada, según /api/config (fuente: dashboard/containment.py).
-export function actionKind(actionName, config) {
-  if (!config?.api_actions?.includes(actionName)) return ACTION_KIND.DECISION
-  return config.no_approval_actions.includes(actionName) ? ACTION_KIND.N1 : ACTION_KIND.APPROVAL
+// Qué puede hacer la persona con una acción recomendada. Lo decide la política (x_approval, calculado por el
+// backend con soc/policy/approvals.py); sin ese dato se asume lo más seguro: pedir aprobación.
+export function actionKind(action, config) {
+  const rule = action.x_approval
+  if (rule && !rule.allowed) return ACTION_KIND.BLOCKED
+  if (!config?.api_actions?.includes(action.action)) return ACTION_KIND.DECISION
+  return rule && !rule.requires_approval ? ACTION_KIND.N1 : ACTION_KIND.APPROVAL
+}
+
+export function approversLabel(action) {
+  return (action.x_approval?.approvers || []).join(' + ')
 }
 
 export function affectedGroups(affected = {}) {

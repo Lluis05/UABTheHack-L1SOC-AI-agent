@@ -22,7 +22,7 @@ export const DECIDER = { POLICY: 'policy', LLM: 'llm', HUMAN: 'human', SIMULATED
 
 export const DECISION = { CLOSE: 'close', ESCALATE: 'escalate', REOPEN: 'reopen', CONTAINMENT: 'containment' }
 
-export const ACTION_KIND = { APPROVAL: 'approval', N1: 'n1', DECISION: 'decision' }
+export const ACTION_KIND = { APPROVAL: 'approval', N1: 'n1', DECISION: 'decision', BLOCKED: 'blocked' }
 
 export const STEP = { QUEUED: 'queued', TICKET: 'ticket', ERROR: 'error' }
 export const JOB_STATUS = { RUNNING: 'running', DONE: 'done', ERROR: 'error' }

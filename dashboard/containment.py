@@ -1,6 +1,7 @@
 """Cliente de la API simulada de Tarvia (06_herramientas/mock_soc_api.py).
 
 Solo lo usa el dashboard, y siempre a partir de un clic humano. El LLM nunca tiene acceso a este módulo.
+Qué acciones necesitan aprobación NO se decide aquí: lo dice la política (dashboard/policy.py → soc/policy/approvals.py).
 """
 from __future__ import annotations
 
@@ -10,13 +11,6 @@ import urllib.request
 
 from dashboard.settings import SOC_API_TIMEOUT_S, SOC_API_URL
 
-# Igual que en la API: N1 ejecuta estas dos sin aprobación (docs/03, tabla de contención).
-# Es la fuente de verdad también para el frontend (se sirve en /api/config).
-NO_APPROVAL_ACTIONS = frozenset({"block_ioc", "purge_email"})
-API_ACTIONS = frozenset({"isolate_host", "disable_user", "revoke_sessions", "reset_password",
-                         "block_ioc", "purge_email", "disable_access_key"})
-
-HTTP_BAD_REQUEST = 400
 HTTP_UNAVAILABLE = 503
 
 
@@ -49,10 +43,6 @@ def _error_detail(e: urllib.error.HTTPError) -> str:
         return str(e)
 
 
-def requires_approval(action: str) -> bool:
-    return action not in NO_APPROVAL_ACTIONS
-
-
 def health() -> bool:
     """True si la API simulada responde."""
     try:
@@ -71,20 +61,18 @@ def approve(action: str, target: str, approver: str, reason: str = "") -> dict:
 def contain(action: str, target: str, justification: str, approval_token: str = "",
             ticket_id: str = "") -> dict:
     """POST /containment/{action}. La API valida que el token corresponda a la acción y el objetivo."""
-    if action not in API_ACTIONS:
-        raise ContainmentError(HTTP_BAD_REQUEST, f"acción no soportada por la API: {action}")
     return _request("POST", f"/containment/{action}",
                     {"target": target, "justification": justification,
                      "approval_token": approval_token, "ticket_id": ticket_id})
 
 
-def approve_and_contain(action: str, target: str, approver: str, justification: str,
-                        ticket_id: str = "") -> dict:
-    """Un clic humano: aprobación (si la acción la necesita) y ejecución.
+def approve_and_contain(action: str, target: str, approver: str, justification: str, *,
+                        requires_approval: bool, ticket_id: str = "") -> dict:
+    """Un clic humano: registra la aprobación si la política la exige y ejecuta.
 
     Devuelve {"approval": {...}|None, "execution": {...}}.
     """
-    approval = approve(action, target, approver, justification) if requires_approval(action) else None
+    approval = approve(action, target, approver, justification) if requires_approval else None
     token = approval["approval_token"] if approval else ""
     execution = contain(action, target, justification, token, ticket_id)
     return {"approval": approval, "execution": execution}

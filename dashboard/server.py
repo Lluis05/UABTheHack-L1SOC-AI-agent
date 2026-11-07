@@ -12,13 +12,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from dashboard import containment
+from dashboard import policy
 from dashboard import settings as s
 from dashboard.live import JobManager, detect_mode
 from dashboard.results import ResultsStore, compute_metrics
+from soc.data.store import get_store
 
 app = FastAPI(title="L1 SOC Dashboard API", version="1.0")
 store = ResultsStore()
 jobs = JobManager()
+# DataStore caliente (CMDB para la política y, más adelante, el pipeline en vivo). Se carga sin bloquear el arranque.
+datastore = policy.StoreHolder(get_store).start()
+HTTP_FORBIDDEN = 403
 
 MIN_APPROVER_LEN = 2
 MIN_JUSTIFICATION_LEN = 5
@@ -26,8 +31,13 @@ VERDICT_PATTERN = "^(" + "|".join(s.VERDICTS) + ")$"
 DECISION_PATTERN = "^(" + "|".join(s.STATUS_BY_DECISION) + ")$"
 
 
+def _tickets() -> list[dict]:
+    """Tickets con la decisión de la política sobre cada acción recomendada (x_approval)."""
+    return [policy.annotate_ticket(t, datastore.get()) for t in store.tickets(jobs.tickets())]
+
+
 def _ticket_or_404(ticket_id: str) -> dict:
-    ticket = store.ticket(ticket_id, jobs.tickets())
+    ticket = next((t for t in _tickets() if t["ticket_id"] == ticket_id), None)
     if not ticket:
         raise HTTPException(404, f"ticket no encontrado: {ticket_id}")
     return ticket
@@ -37,8 +47,7 @@ def _ticket_or_404(ticket_id: str) -> dict:
 @app.get("/api/config")
 def config() -> dict:
     """Constantes que el frontend no debe duplicar."""
-    return {"api_actions": sorted(containment.API_ACTIONS),
-            "no_approval_actions": sorted(containment.NO_APPROVAL_ACTIONS),
+    return {"api_actions": sorted(policy.API_ACTIONS),
             "live_steps": list(s.LIVE_STEPS), "live_target_seconds": s.LIVE_TARGET_SECONDS,
             "max_live_alerts": s.MAX_LIVE_ALERTS, "manual_minutes_per_alert": s.MINUTES_PER_ALERT_MANUAL}
 
@@ -46,12 +55,13 @@ def config() -> dict:
 @app.get("/api/health")
 def health() -> dict:
     return {"soc_api": containment.health(), "soc_api_url": s.SOC_API_URL,
-            "data_source": store.source, "live_mode": detect_mode()}
+            "data_source": store.source, "live_mode": detect_mode(),
+            "datastore": datastore.status, "datastore_error": datastore.error}
 
 
 @app.get("/api/tickets")
 def list_tickets() -> dict:
-    tickets = sorted(store.tickets(jobs.tickets()), key=lambda t: t.get("ticket_id", ""), reverse=True)
+    tickets = sorted(_tickets(), key=lambda t: t.get("ticket_id", ""), reverse=True)
     return {"source": store.source, "tickets": tickets}
 
 
@@ -94,12 +104,17 @@ class ContainmentRequest(BaseModel):
 
 @app.post("/api/tickets/{ticket_id}/containment")
 def run_containment(ticket_id: str, req: ContainmentRequest) -> dict:
-    """Clic humano en "Aprobar acción": POST /approvals + POST /containment/{accion} en la API simulada."""
+    """Clic humano: la política decide si se puede y quién aprueba; luego /approvals + /containment/{accion}."""
     _ticket_or_404(ticket_id)
     base = {"ticket_id": ticket_id, "type": s.DECISION_CONTAINMENT, "action": req.action, "target": req.target,
             "approver": req.approver, "comment": req.justification}
+    rule = policy.approval(req.action, req.target, datastore.get())
+    base["approvers"] = rule["approvers"]
     try:
-        res = containment.approve_and_contain(req.action, req.target, req.approver, req.justification, ticket_id)
+        if not rule["allowed"]:  # p. ej. OT: no se llama a la API, se escala
+            raise containment.ContainmentError(HTTP_FORBIDDEN, rule["note"])
+        res = containment.approve_and_contain(req.action, req.target, req.approver, req.justification,
+                                              requires_approval=rule["requires_approval"], ticket_id=ticket_id)
     except containment.ContainmentError as e:
         store.record_decision({**base, "ok": False, "error": e.detail, "status": e.status})
         raise HTTPException(e.status, e.detail) from e
