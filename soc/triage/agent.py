@@ -23,9 +23,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures as cf
-import copy
 import hashlib
-import ipaddress
 import json
 import logging
 import os
@@ -51,8 +49,6 @@ ALERT_TIMEOUT_S = int(os.getenv("ALERT_TIMEOUT", "150"))
 VERDICTS = ["true_positive", "benign_true_positive", "false_positive", "needs_more_info"]
 ACTIONS = ["purge_email", "block_ioc", "revoke_sessions", "reset_password", "isolate_host", "disable_user",
            "disable_access_key", "close", "escalate", "monitor"]
-SEVERITIES = ["informational", "low", "medium", "high", "critical"]
-CRITICALITIES = ["Baja", "Media", "Alta", "Crítica"]
 
 # Esquema de salida del LLM (subset del Ticket + propuestas). Lo que no está aquí lo rellena el código.
 LLM_SCHEMA: dict = {
@@ -215,9 +211,15 @@ def build_user_prompt(ctx: dict, prefilter_hint: dict | None = None) -> tuple[st
         "<policy_results>\n" + escape_untrusted(json.dumps(policy, ensure_ascii=False, default=str)) +
         "\n</policy_results>",
     ]
+    if not prefilter_hint:
+        # Sin prefiltro explícito, la sugerencia de la política (soc.policy.suggest_verdict) hace de pista
+        sug = (ctx.get("severity") or {}).get("suggestion") or {}
+        if sug.get("verdict"):
+            prefilter_hint = {"verdict": sug["verdict"], "summary": "Sugerido por la política: " +
+                              ", ".join(sug.get("because") or []), "decisive": sug.get("decisive")}
     if prefilter_hint:
-        hint = {k: prefilter_hint.get(k) for k in ("verdict", "title", "summary", "severity", "x_policy_hits")
-                if prefilter_hint.get(k)}
+        hint = {k: prefilter_hint.get(k) for k in ("verdict", "title", "summary", "severity", "decisive",
+                                                   "x_policy_hits") if prefilter_hint.get(k) is not None}
         parts.append("Pista del prefiltro determinista (confírmala o discrepa con argumentos):\n" +
                      escape_untrusted(json.dumps(hint, ensure_ascii=False, default=str)))
     else:
@@ -257,155 +259,52 @@ def cached_complete(system: str, prompt: str, use_cache: bool = True) -> tuple[d
     return result, provider, False
 
 
-# ---------------------------------------------------------- severidad (código)
-_MATRIX = {
-    "informational": ["informational", "informational", "low", "low"],
-    "low": ["informational", "low", "low", "medium"],
-    "medium": ["low", "medium", "medium", "high"],
-    "high": ["medium", "high", "high", "critical"],
-    "critical": ["high", "critical", "critical", "critical"],
-}
-
-
-def _truthy(v: Any) -> bool:
-    return str(v).strip().lower() in ("true", "1", "yes", "sí", "si")
-
-
-def _max_criticality(ctx: dict) -> tuple[str, str]:
-    """Criticidad del activo/identidad más crítico (convención de docs/03). Devuelve (criticidad, origen)."""
-    best, src = None, "ningún activo identificado"
-    for a in ctx.get("assets") or []:
-        c = a.get("criticality")
-        if c in CRITICALITIES and (best is None or CRITICALITIES.index(c) > CRITICALITIES.index(best)):
-            best, src = c, a.get("hostname") or "?"
-    for u in ctx.get("users") or []:
-        if u.get("_via") not in (None, "alert"):
-            continue
-        upn = (u.get("upn") or "").lower()
-        if upn.startswith("adm.") or (u.get("account_type") == "service" and _truthy(u.get("privileged"))):
-            c = "Crítica"
-        elif _truthy(u.get("vip")) or _truthy(u.get("privileged")) or u.get("account_type") == "admin":
-            c = "Alta"
-        else:
-            c = "Media"
-        if best is None or CRITICALITIES.index(c) > CRITICALITIES.index(best):
-            best, src = c, upn or "?"
-    return best or "Media", src
-
-
-def _provisional_severity(rule_sev: str, max_crit: str, plus: list[str], minus: list[str],
-                          authorized: bool) -> dict:
-    """Réplica mínima de la matriz mientras soc/policy/severity.py (Persona A) no existe."""
-    rule_sev = rule_sev if rule_sev in _MATRIX else "medium"
-    base = _MATRIX[rule_sev][CRITICALITIES.index(max_crit)]
-    adj = 1 if plus else (-1 if minus else 0)
-    final = SEVERITIES[max(0, min(len(SEVERITIES) - 1, SEVERITIES.index(base) + adj))]
-    if authorized:
-        final = "informational" if SEVERITIES.index(final) <= 1 else "low"
-    reasons = plus if adj > 0 else (minus if adj < 0 else [])
-    rationale = f"Regla {rule_sev} × activo {max_crit} = {base}"
-    rationale += (f"; {'+1' if adj > 0 else '−1'} ({'; '.join(reasons)})" if adj else "; sin ajustes")
-    if authorized:
-        rationale += f"; actividad autorizada → {final}"
-    return {"rule_severity": rule_sev, "max_criticality": max_crit, "base": base, "adjustment": adj,
-            "adjustment_reasons": reasons, "final": final, "rationale": rationale + "."}
-
-
+# ------------------------------------------------- severidad y aprobaciones (código, Persona A)
 def final_severity(ctx: dict, verdict: str, plus: list[str], minus: list[str]) -> dict:
-    """Severidad final: SIEMPRE por código. Usa soc.policy.severity si existe (Persona A)."""
+    """Severidad final: SIEMPRE por código (soc.policy.severity.compute_severity).
+
+    Parte del resultado de la política (ctx["severity"]) y añade los ajustes que propone el LLM, que el
+    código valida: el +1 del LLM solo cuenta si su veredicto es true_positive; el −1 solo si no hay +1.
+    El veredicto final (del LLM) decide si se aplica 'autorizado' o 'falso positivo'.
+    """
+    from soc.policy.severity import compute_severity, max_criticality
+
     alert = ctx.get("alert") or {}
     pol = ctx.get("severity") or {}
-    max_crit = pol.get("max_criticality")
-    crit_src = pol.get("criticality_source")
-    if max_crit not in CRITICALITIES:
-        max_crit, crit_src = _max_criticality(ctx)
-    rule_sev = pol.get("rule_severity") or alert.get("severity") or "medium"
-    authorized = verdict == "benign_true_positive"
-    # El código valida las propuestas del LLM: subir solo si es TP; bajar solo si nada justifica subir.
-    plus = plus if verdict == "true_positive" else []
-    minus = [] if plus else minus
-    try:
-        from soc.policy.severity import compute_severity  # type: ignore
-
-        sev = compute_severity(rule_sev, max_crit, plus, minus, authorized)
-        sev = dict(sev)
-    except ImportError:
-        sev = _provisional_severity(rule_sev, max_crit, plus, minus, authorized)
-        sev["_provisional"] = True
-    sev.setdefault("criticality_source", crit_src)
-    if verdict == "false_positive":
-        # Convención del equipo (la política no lo define): si la regla se equivoca no hay amenaza.
-        sev["base_if_true"] = sev.get("final")
-        sev["final"] = "informational"
-        sev["rationale"] = (sev.get("rationale", "").rstrip(".") +
-                            "; falso positivo (sin actividad maliciosa) → informational.")
+    if pol.get("max_criticality"):
+        crit, src = pol["max_criticality"], pol.get("criticality_source", "")
+    else:
+        crit, src, _ = max_criticality(ctx)
+    llm_plus = [f"(IA) {r}" for r in plus] if verdict == "true_positive" else []
+    llm_minus = [f"(IA) {r}" for r in minus]
+    all_plus = list(dict.fromkeys(list(pol.get("plus_reasons") or []) + llm_plus))
+    all_minus = [] if all_plus else list(dict.fromkeys(list(pol.get("minus_reasons") or []) + llm_minus))
+    sev = compute_severity(pol.get("rule_severity") or alert.get("severity"), crit, all_plus, all_minus,
+                           authorized=verdict == "benign_true_positive",
+                           false_positive=verdict == "false_positive", criticality_source=src)
+    sev["policy_final"] = pol.get("final")          # lo que habría dicho la política sola
+    sev["llm_proposed"] = {"plus": plus, "minus": minus}
     return sev
 
 
-# ---------------------------------------------------------- aprobaciones (código)
-OT_NET = ipaddress.ip_network("10.40.16.0/20")
-DUAL_USE = ("mega.nz", "mega.io", "anydesk", "wetransfer", "dropbox", "drive.google", "teamviewer")
+def finalize_actions(actions: list[dict], store: Any = None) -> tuple[list[dict], list[str]]:
+    """Aplica la tabla de aprobaciones (soc.policy.approvals) y descarta lo prohibido (OT → escalar)."""
+    from soc.policy.approvals import approval_for
 
-
-def _asset_for(target: str, ctx: dict) -> dict | None:
-    t = (target or "").strip().lower()
-    for a in ctx.get("assets") or []:
-        if t in ((a.get("hostname") or "").lower(), (a.get("ip") or "").lower()):
-            return a
-    return None
-
-
-def _is_ot(target: str, ctx: dict) -> bool:
-    a = _asset_for(target, ctx)
-    if a and "OT" in (a.get("zone") or "").upper():
-        return True
-    try:
-        return ipaddress.ip_address(target.strip()) in OT_NET
-    except ValueError:
-        return bool(re.match(r"(?i)^(plc-|hmi-)", target.strip()))
-
-
-def approval_for(action: str, target: str, ctx: dict) -> tuple[bool, list[str], str | None]:
-    """(requires_approval, aprobadores, nota) según la tabla de la política (docs/03 §Contención)."""
-    if action in ("close", "monitor", "escalate", "purge_email"):
-        return False, [], None
-    if action == "block_ioc":
-        if any(d in (target or "").lower() for d in DUAL_USE):
-            return True, ["N2"], "Servicio de uso dual: no se bloquea globalmente sin N2"
-        return False, [], None
-    if action == "isolate_host":
-        a = _asset_for(target, ctx) or {}
-        typ = (a.get("type") or "").lower()
-        host = (a.get("hostname") or target or "").upper()
-        if typ in ("tpv", "frontal web", "pasarela de pagos") or host.startswith(("POS-", "WEB-ECOM", "PAY-")):
-            return True, ["N2", "negocio"], "Impacto directo en ventas"
-        if typ and typ != "portátil" or (not typ and not host.startswith(("WS-", "LT-"))):
-            svc = a.get("business_service") or "servicio afectado"
-            return True, ["N2", f"responsable de {svc}"], "Servidor: ver servicios_negocio.csv"
-        return True, ["N2"], None
-    if action == "disable_user":
-        upn = (target or "").lower()
-        note = "Cuenta de servicio: puede parar un proceso de negocio" if upn.startswith("svc") else None
-        return True, ["N2"], note
-    return True, ["N2"], None  # revoke_sessions, reset_password, disable_access_key, desconocidas
-
-
-def finalize_actions(actions: list[dict], ctx: dict) -> tuple[list[dict], list[str]]:
-    """Aplica la tabla de aprobaciones y elimina acciones prohibidas (OT). Devuelve (acciones, avisos)."""
     out, notes = [], []
     for a in actions or []:
         act, tgt = a.get("action"), str(a.get("target") or "")
-        if act not in ACTIONS:
-            notes.append(f"Acción desconocida descartada: {act}")
-            continue
-        if act not in ("close", "monitor", "escalate") and _is_ot(tgt, ctx):
-            notes.append(f"Acción {act} sobre OT ({tgt}) descartada: en OT solo se escala a Operaciones")
-            act = "escalate"
-            a = {**a, "justification": "Activo OT: solo escalar a N2 y al Responsable de Operaciones"}
-        req, approvers, note = approval_for(act, tgt, ctx)
-        out.append({"action": act, "target": tgt, "requires_approval": req,
-                    "justification": a.get("justification", ""),
-                    "x_approvers": approvers, **({"x_note": note} if note else {})})
+        ap = approval_for(act, tgt, store)
+        if not ap["allowed"]:
+            notes.append(f"Acción {act} sobre {tgt} descartada por la política: {ap['note']}")
+            if "OT" in ap["note"]:
+                act, ap = "escalate", {"requires_approval": False, "approvers": ap["approvers"], "note": ap["note"]}
+                a = {**a, "justification": "Activo OT: solo escalar a N2 y al Responsable de Operaciones"}
+            else:
+                continue
+        out.append({"action": act, "target": tgt, "requires_approval": ap["requires_approval"],
+                    "justification": a.get("justification", ""), "x_approvers": ap.get("approvers", []),
+                    **({"x_note": ap["note"]} if ap.get("note") else {})})
     return out, notes
 
 
@@ -436,7 +335,7 @@ def _status(verdict: str, escalate: bool, actions: list[dict]) -> str:
 
 
 def assemble_ticket(ctx: dict, llm: dict, provider: str | None, *, cached: bool = False,
-                    decided_by_verdict: str = "llm", t_start: float | None = None) -> dict:
+                    decided_by_verdict: str = "llm", t_start: float | None = None, store: Any = None) -> dict:
     """Combina la salida del LLM con las decisiones del código → Ticket (contrato docs/04)."""
     from soc.triage.reviewer import validate_evidence
 
@@ -448,7 +347,10 @@ def assemble_ticket(ctx: dict, llm: dict, provider: str | None, *, cached: bool 
     except (TypeError, ValueError):
         confidence = 0.5
     sev = final_severity(ctx, verdict, list(llm.get("plus_reasons") or []), list(llm.get("minus_reasons") or []))
-    actions, action_notes = finalize_actions(llm.get("recommended_actions") or [], ctx)
+    if store is None:
+        from soc.data import store as _store_mod
+        store = _store_mod._STORE  # singleton ya cargado (no fuerza una carga)
+    actions, action_notes = finalize_actions(llm.get("recommended_actions") or [], store)
 
     # Escalado: lo que proponga el LLM + los criterios obligatorios de la política (código)
     reasons = []
@@ -468,7 +370,7 @@ def assemble_ticket(ctx: dict, llm: dict, provider: str | None, *, cached: bool 
     open_q = list(llm.get("open_questions") or [])
     if ctx.get("missing_related_events"):
         open_q.append(f"La alerta cita eventos que no tenemos: {', '.join(ctx['missing_related_events'][:5])}")
-    if sev.get("criticality_source") == "ningún activo identificado":
+    if sev.get("criticality_source") in ("desconocido", ""):
         open_q.append("No se identificó el activo afectado en la CMDB: criticidad asumida Media")
 
     ticket = {
@@ -514,6 +416,13 @@ def assemble_ticket(ctx: dict, llm: dict, provider: str | None, *, cached: bool 
 def fallback_ticket(ctx: dict, prefilter_hint: dict | None, error: str, t_start: float | None = None) -> dict:
     """Ticket SIN IA (LLM caído): el prefiltro si lo hay; si no, needs_more_info. Siempre marcado como tal."""
     hint = prefilter_hint or {}
+    sug = (ctx.get("severity") or {}).get("suggestion") or {}
+    if not hint and sug.get("decisive") and sug.get("verdict"):
+        hint = {"verdict": sug["verdict"], "confidence": sug.get("confidence", 0.5),
+                "summary": "[SIN IA] Decisión de la política determinista: " + ", ".join(sug.get("because") or []),
+                "recommended_actions": [{"action": "close" if sug["verdict"] != "true_positive" else "escalate",
+                                         "target": "ticket" if sug["verdict"] != "true_positive" else "N2",
+                                         "justification": "Decisión determinista; revisar cuando vuelva la IA"}]}
     llm = {
         "title": hint.get("title") or f"[SIN IA] {(ctx.get('alert') or {}).get('rule_name', 'Alerta')}",
         "verdict": hint.get("verdict") or "needs_more_info",
@@ -522,6 +431,8 @@ def fallback_ticket(ctx: dict, prefilter_hint: dict | None, error: str, t_start:
         "evidence": hint.get("evidence") or [],
         "recommended_actions": hint.get("recommended_actions") or [
             {"action": "escalate", "target": "N1 humano", "justification": "Triaje automático no disponible"}],
+        "escalate": hint.get("verdict") == "true_positive",
+        "escalation_reason": "Posible true_positive sin análisis de IA: revisión humana",
         "open_questions": [f"IA no disponible ({error[:200]})"],
     }
     t = assemble_ticket(ctx, llm, None, decided_by_verdict="policy" if hint else "none", t_start=t_start)
