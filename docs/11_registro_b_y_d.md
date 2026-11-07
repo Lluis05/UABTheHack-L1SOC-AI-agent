@@ -4,15 +4,10 @@ Qué se ha hecho, dónde está, cómo reproducir lo que **no** está en git (tod
 decisiones se tomaron y qué queda pendiente. Los hallazgos del dataset están en [09](09_hallazgos.md); los
 contratos, en [04](04_arquitectura.md).
 
-## 1. Estado de las ramas (07/11)
-| Rama | Contenido | ¿En main? |
-|---|---|---|
-| `feat/agent` | B2-B5: agente, revisor, evaluación, casos de inyección, hallazgo de Gemini | Hasta `fd9a729` sí; los commits de evaluación, inyección y Gemini **no** |
-| `feat/correlate` | Sale de `feat/agent` y añade D1-D4: hunting, verdad, etiquetas, correlación, informe nivel 3 | **No** |
-
-Para integrar: `feat/correlate` contiene todo `feat/agent`, así que basta con `git checkout main && git pull &&
-git merge --ff-only feat/correlate` (si main ha avanzado: `git checkout feat/correlate && git rebase main` antes).
-**Pendiente de decidir quién lo hace**, porque toca docs de todos.
+## 1. Estado de las ramas
+**Integrado en `main` el 07/11** (`df90c7a`, fast-forward, 112 tests en verde): `feat/agent` (B2-B5) y
+`feat/correlate` (D1-D4, que sale de `feat/agent`), después de traer el último `main` de Lluis (`b8d8cd4`).
+Para seguir trabajando: `git checkout feat/correlate && git pull` (o `feat/agent`) y `git merge main` antes de subir.
 
 ## 2. Configuración local que no va en git
 - `.env`: `GEMINI_API_KEY` (la de Marc, **regenerarla tras el hackathon**: se pegó en un chat) y
