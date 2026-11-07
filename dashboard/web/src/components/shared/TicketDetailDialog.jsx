@@ -1,4 +1,4 @@
-import { AppAlert, AppButton, AppDialog, AppStack, AppTabs, AppText } from '../base'
+import { AppAlert, AppButton, AppDialog, AppSkeletonRows, AppStack, AppTabs } from '../base'
 import { DETAIL_TAB, DETAIL_TABS } from '../../config/constants.js'
 import DecisionHistory from './DecisionHistory.jsx'
 import EvidencePanel from './EvidencePanel.jsx'
@@ -20,7 +20,7 @@ export default function TicketDetailDialog({ ticket, tab, onTabChange, onClose, 
         {tab === DETAIL_TAB.TRACE ? (
           <>
             {traceError ? <AppAlert tone="error">No se ha podido cargar la traza: {traceError}</AppAlert> : null}
-            {traceLoading ? <AppText tone="muted">Cargando traza…</AppText> : <TraceTimeline trace={trace} />}
+            {traceLoading ? <AppSkeletonRows rows={6} height={52} label="Cargando traza" /> : <TraceTimeline trace={trace} />}
           </>
         ) : null}
         {tab === DETAIL_TAB.HISTORY ? <DecisionHistory decisions={ticket.x_human_decisions} /> : null}

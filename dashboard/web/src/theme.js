@@ -29,11 +29,21 @@ const SANS = '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, san
 const MONO = '"IBM Plex Mono", ui-monospace, Consolas, monospace'
 const TABULAR = { fontVariantNumeric: 'tabular-nums' }
 
-export const theme = createTheme({
+// Breakpoint «md» de MUI: por debajo, navegación inferior y lista/detalle como pantallas separadas
+const MD_MAX = '899.95px'
+const HEADER_HEIGHT = 52
+const BOTTOM_NAV_HEIGHT = 56
+// Área táctil mínima con dedo (WCAG 2.5.5 / guías de iOS y Android)
+const TOUCH_TARGET = 44
+// iOS hace zoom al enfocar un campo con letra de menos de 16px
+const TOUCH_INPUT_FONT = 16
+
+// Opciones del tema «actual»: las variantes de themes/ parten de aquí y solo sobrescriben lo que cambian
+export const themeOptions = {
   palette: {
     mode: 'dark',
     primary: { main: PALETTE.signal },
-    background: { default: PALETTE.night, paper: PALETTE.panel },
+    background: { default: PALETTE.night, paper: PALETTE.panel, bar: PALETTE.panel },
     divider: PALETTE.line,
     text: { primary: PALETTE.ink, secondary: PALETTE.muted },
     success: { main: '#4cc38a' },
@@ -62,22 +72,40 @@ export const theme = createTheme({
     metric: { fontSize: 22, fontWeight: 700, lineHeight: 1.2, ...TABULAR },
     caption: { ...TABULAR },
   },
+  // Alturas en dvh (la barra del navegador móvil no tapa nada) y relativas a --header-h, que AppTopBar mide en
+  // vivo: si la cabecera cambia de alto, nada se descuadra.
   layout: {
-    queueWidth: 420, queueMaxHeight: 'calc(100vh - 230px)', logMaxHeight: 260,
-    ticketCardMinWidth: 320, ticketCardHeight: 168,
+    headerHeight: HEADER_HEIGHT, bottomNavHeight: BOTTOM_NAV_HEIGHT,
+    queueMaxHeight: 'calc(100dvh - var(--header-h) - var(--bottom-nav-h) - 128px)', logMaxHeight: 260,
+    // La cola a pantalla completa (tabla): ocupa hasta el borde inferior
+    queueTableMaxHeight: 'calc(100dvh - var(--header-h) - var(--bottom-nav-h) - 200px)',
+    ticketCardMinWidth: 300, ticketCardHeight: 132,
+    // Columna del detalle: en pantallas muy anchas no se estira más (líneas legibles)
+    detailMaxWidth: 1400,
     // Modal de información extendida: alto fijo proporcional a la pantalla
-    dialogLgHeight: '80vh',
-    // Panel del chat con forma de móvil: debajo de la cabecera fija y hasta el borde inferior de la pantalla
-    phoneTop: 112, phoneHeight: 'calc(100vh - 128px)',
-    // Log del chat dentro de ese panel: lo que queda tras muesca, título, aviso, campo de pregunta y botones
-    chatLogHeight: 'calc(100vh - 470px)',
+    dialogLgHeight: '80dvh',
+    // Panel lateral del asistente: fijo bajo la cabecera y hasta el borde inferior de la pantalla
+    sidePanelTop: 'calc(var(--header-h) + 16px)', sidePanelHeight: 'calc(100dvh - var(--header-h) - 32px)',
+    // Asistente como cajón (por debajo de lg): ancho a la derecha; en móvil, hoja inferior
+    asideDrawerWidth: 440, asideSheetHeight: '85dvh',
     // Upload: la zona de entrada y el progreso tienen alto fijo (no saltan al cambiar de modo ni al llegar alertas)
-    uploadInputHeight: 230, uploadProgressHeight: '45vh',
+    uploadInputHeight: 230, uploadProgressHeight: '45dvh',
   },
   components: {
     MuiCssBaseline: {
       styleOverrides: {
         html: { colorScheme: 'dark' },
+        ':root': { '--header-h': `${HEADER_HEIGHT}px`, '--bottom-nav-h': '0px' },
+        [`@media (max-width: ${MD_MAX})`]: {
+          ':root': { '--bottom-nav-h': `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` },
+        },
+        // Con dedo: áreas táctiles de 44px y campos a 16px
+        '@media (pointer: coarse)': {
+          '.MuiButton-root, .MuiIconButton-root, .MuiTab-root, .MuiMenuItem-root': { minHeight: TOUCH_TARGET },
+          '.MuiIconButton-root': { minWidth: TOUCH_TARGET },
+          '.MuiChip-deletable, .MuiChip-clickable': { height: 32 },
+          '.MuiInputBase-input': { fontSize: TOUCH_INPUT_FONT },
+        },
         // web-design-guidelines: respetar prefers-reduced-motion
         '@media (prefers-reduced-motion: reduce)': {
           '*, *::before, *::after': { animationDuration: '0.01ms !important', transitionDuration: '0.01ms !important' },
@@ -96,4 +124,6 @@ export const theme = createTheme({
     // Deshabilitado: legible pero claramente inactivo (botones, tabs, tarjetas)
     MuiButtonBase: { styleOverrides: { root: { '&.Mui-disabled': { opacity: 0.45 } } } },
   },
-})
+}
+
+export const theme = createTheme(themeOptions)

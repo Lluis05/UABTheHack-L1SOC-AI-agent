@@ -5,10 +5,11 @@ import { canSend } from '../../utils/chat.js'
 
 // Cómo se pinta cada autor del chat (tono = clave de la paleta del tema)
 const CHAT_ROLES = {
-  [CHAT_ROLE.USER]: { label: 'Tú', tone: 'human', align: 'end' },
-  [CHAT_ROLE.MODEL]: { label: 'Asistente IA (Gemini)', tone: 'llm', align: 'start' },
-  [CHAT_ROLE.ERROR]: { label: 'Error', tone: 'error', align: 'start' },
-  pending: { label: 'Asistente IA (Gemini)', tone: 'llm', align: 'start' },
+  [CHAT_ROLE.USER]: { label: 'Tú', tone: 'human', align: 'end', variant: 'bubble' },
+  // La respuesta se lee como un documento: a todo el ancho y con formato (viñetas, negrita, IDs en código)
+  [CHAT_ROLE.MODEL]: { label: 'Asistente IA (Gemini)', tone: 'llm', align: 'start', variant: 'document', rich: true },
+  [CHAT_ROLE.ERROR]: { label: 'Error', tone: 'error', align: 'start', variant: 'document' },
+  pending: { label: 'Asistente IA (Gemini)', tone: 'llm', align: 'start', variant: 'document' },
 }
 const PENDING_TEXT = 'Pensando…'
 
@@ -43,14 +44,15 @@ export default function TicketChat({ chat, maxChars = CHAT_DEFAULT_MAX_CHARS }) 
   )
 
   return (
-    <AppStack gap={1.5}>
+    // grow: la columna ocupa el alto del panel; solo la conversación hace scroll y la pregunta queda siempre visible
+    <AppStack gap={1.5} grow>
       <AppAlert tone="info">
         Las respuestas las genera una IA a partir de los datos del ticket y pueden contener errores: verifica las
         evidencias antes de decidir.
       </AppAlert>
       <AppChatLog messages={chat.messages} roles={CHAT_ROLES} pending={chat.busy ? PENDING_TEXT : null}
-                  empty={empty} height="chatLogHeight" label="Conversación con la IA sobre el ticket" />
-      {/* Panel estrecho (forma de móvil): campo a todo el ancho y botones debajo */}
+                  empty={empty} label="Conversación con la IA sobre el ticket" />
+      {/* Campo a todo el ancho y botones debajo: el panel puede ser estrecho */}
       <AppTextField label="Tu pregunta" name="chat-question" value={text} onChange={setText} rows={1}
                     onKeyDown={onKeyDown} placeholder="¿Por qué se ha cerrado este ticket?"
                     inputProps={{ maxLength: maxChars }} autoComplete="off" />

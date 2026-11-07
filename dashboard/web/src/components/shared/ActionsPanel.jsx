@@ -14,9 +14,9 @@ const KIND = {
 const EXECUTED_COLUMNS = [
   { key: 'action', label: 'Acción', mono: true },
   { key: 'target', label: 'Objetivo', mono: true },
-  { key: 'approved_by', label: 'Aprobó' },
-  { key: 'approval_token', label: 'Token', mono: true, render: (r) => r.approval_token || 'N1, sin aprobación' },
-  { key: 'timestamp', label: 'Cuándo', render: (r) => formatDateTime(r.timestamp) },
+  { key: 'approved_by', label: 'Aprobó', nowrap: true },
+  { key: 'approval_token', label: 'Token', mono: true, hideBelow: 'md', render: (r) => r.approval_token || 'N1, sin aprobación' },
+  { key: 'timestamp', label: 'Cuándo', mono: true, render: (r) => formatDateTime(r.timestamp) },
 ]
 
 // Acciones recomendadas. El LLM solo propone: ejecutar es siempre un clic humano (onRequest abre la confirmación).

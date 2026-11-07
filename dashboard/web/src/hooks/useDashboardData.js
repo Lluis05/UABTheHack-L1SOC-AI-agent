@@ -18,6 +18,8 @@ export function useDashboardData() {
   const { data, error, reload } = useAsync(loader, [loader])
   useInterval(reload, POLL_DASHBOARD_MS)
   return {
+    // Primera carga todavía en curso (sin datos ni error): la cola muestra un esqueleto, no «ningún ticket»
+    loading: !data && !error,
     tickets: data?.tickets ?? [],
     source: data?.source,
     metrics: data?.metrics,

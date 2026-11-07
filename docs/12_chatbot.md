@@ -17,8 +17,12 @@ Autor: Marc Cantero (rama `feat/chatbot`). Fecha: 07/11/2026.
 ## Cómo se usa
 
 1. Abre un ticket en la cola (pestaña **Tickets**).
-2. Pulsa **«Preguntar a la IA»** en la cabecera del ticket. El chat se abre a la derecha en un panel con forma de móvil
-   (1/3 del ancho) y la cola de la izquierda se comprime (severidad, confianza y el inicio del título).
+2. Pulsa **«Preguntar a la IA»** en la cabecera del ticket. El asistente se abre como tercera columna a la derecha
+   (cola | ficha | asistente). Las tres columnas se ajustan arrastrando los separadores (o con ←/→ con el foco en
+   ellos), y la cola y el asistente se pliegan con el botón del separador: quedan como un raíl estrecho con su nombre
+   para volver a abrirlos. Los anchos se recuerdan en el navegador. Si la cola se estrecha, sus tarjetas pasan a
+   compactas. En pantallas de menos de 1200 px el asistente se abre como cajón a la derecha, y en el móvil como
+   hoja inferior. El atajo **i** lo abre y lo cierra.
 3. Elige una de las preguntas sugeridas o escribe la tuya (Enter envía, Mayús+Enter salta de línea).
 4. **«Nueva conversación»** borra el historial. La conversación se mantiene al cerrar y reabrir el panel, y se pierde
    al cambiar de ticket o recargar la página (no se guarda en el servidor).
@@ -45,12 +49,23 @@ QueuePage → AppPhonePanel (lateral derecho)
 | Servicio | `web/src/services/socService.js` → `chat()` | Llamada HTTP |
 | Hook | `web/src/hooks/useTicketChat.js` | Estado de la conversación (mensajes, ocupado, errores) |
 | Lógica pura | `web/src/utils/chat.js` (+ `chat.test.js`) | `toHistory`, `canSend` |
-| Base | `web/src/components/base/AppChatLog.jsx` | Log de mensajes con alto fijo y autoscroll (única pieza nueva que toca MUI) |
+| Base | `web/src/components/base/AppChatLog.jsx` | Log con autoscroll; la pregunta va en burbuja y la respuesta como documento a todo el ancho |
+| Base | `web/src/components/base/AppRichText.jsx` + `utils/markdown.js` | Formato de las respuestas (Markdown mínimo, sin HTML crudo) |
+| Base | `web/src/components/base/AppSplit.jsx` + `utils/panes.js` + `hooks/usePaneLayout.js` | Columnas ajustables y plegables |
 | Compuesto | `web/src/components/shared/TicketChat.jsx` | Sugerencias, log, campo de pregunta, botones |
-| Integración | `AppPhonePanel.jsx` (panel lateral con forma de móvil), `TicketHeader.jsx` (botón), `QueuePage.jsx` (hook y panel en `TicketWorkspace`) |
+| Integración | `AppSidePanel.jsx` (panel lateral), `TicketHeader.jsx` (botón), `QueuePage.jsx` (hook, columnas y panel en `TicketWorkspace`) |
 
 Respeta la estructura base → shared → pages de `docs/06_setup_y_convenciones.md`: sin cadenas ni números mágicos
 (todo en `constants.js`, `settings.py` y `theme.layout.chatLogHeight`), y la lógica reutilizable tiene tests.
+
+## Formato de las respuestas
+
+El modelo responde con un **Markdown mínimo** que pinta `AppRichText` (parser propio en `utils/markdown.js`, con tests):
+una primera frase que responde directamente con lo esencial en **negrita**, luego viñetas (`- `) o pasos numerados
+(`1. `), sub-viñetas con dos espacios, `código` para identificadores (event_id, reglas, CHG-…, IPs, hosts, usuarios,
+campos del ticket) y subtítulos `### ` solo en respuestas largas. En una viñeta «Etiqueta: texto», la etiqueta se
+pone en negrita automáticamente. No hay tablas, enlaces, imágenes ni HTML: todo se pinta con elementos React, así que
+aunque la respuesta repita texto del atacante no se puede inyectar HTML.
 
 ## Contrato del endpoint
 
@@ -59,7 +74,7 @@ POST /api/tickets/{ticket_id}/chat
 {"question": "¿Por qué se ha cerrado?",                    // 1..CHAT_MAX_QUESTION_CHARS (2000)
  "history": [{"role": "user|model", "text": "..."}]}     // conversación previa (se usan las últimas CHAT_MAX_TURNS)
 
-200 → {"answer": "texto plano en castellano", "model": "gemini-3.5-flash"}   // modelo que respondió de verdad
+200 → {"answer": "Markdown mínimo en castellano", "model": "gemini-3.5-flash"}   // modelo que respondió de verdad
 404 → ticket no encontrado · 422 → petición inválida (rol desconocido, pregunta vacía/larga)
 502 → Gemini no ha respondido (se listan los errores de cada modelo probado) · 503 → falta GEMINI_API_KEY
 ```
@@ -123,5 +138,4 @@ CHAT_FALLBACK_MODELS=gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite   #
 ## Pendiente / ideas
 
 - Respuestas en streaming (ahora se espera la respuesta entera; con flash suele tardar pocos segundos).
-- Renderizar Markdown (ahora se pide texto plano al modelo y se pinta con saltos de línea).
 - Chat también en la página de **Incidentes** (mismo patrón, pasando el incidente y su informe).

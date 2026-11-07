@@ -19,13 +19,13 @@ function IncidentCard({ incident: inc, selected, onSelect }) {
   const tactics = incidentTactics(inc)
   return (
     <AppSelectableCard selected={selected} tone={CHIP_KINDS.severity[inc.severity]?.[1]} label={inc.incident_id}
-                       onClick={() => onSelect(selected ? null : inc.incident_id)}>
+                       itemId={inc.incident_id} onClick={() => onSelect(inc.incident_id)}>
       <AppStack gap={1}>
         <AppStack direction="row" gap={0.75} wrap>
           <AppText variant="mono">{inc.incident_id}</AppText>
           <AppChip {...chipProps('severity', inc.severity)} />
           <AppChip label={countLabel(inc.alert_ids?.length || 0, 'alerta')} />
-          {inc.x_chain ? <AppChip label={countLabel(tactics.length, 'fase')} tone="sevHigh" title={tactics.join(' → ')} /> : null}
+          {inc.x_chain ? <AppChip label={countLabel(tactics.length, 'fase')} icon="mitre" title={tactics.join(' → ')} /> : null}
         </AppStack>
         <AppText variant="caption" tone="muted" lines={CARD_SUMMARY_LINES}>{tactics.join(' → ')}</AppText>
         <AppText variant="caption" tone="muted">{formatDateTime(inc.first_seen)} – {formatDateTime(inc.last_seen)}</AppText>

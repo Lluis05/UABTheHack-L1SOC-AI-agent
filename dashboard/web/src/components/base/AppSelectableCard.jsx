@@ -4,7 +4,8 @@ import CardActionArea from '@mui/material/CardActionArea'
 // Tarjeta clicable con estados visibles:
 //   hover: borde gris claro · active: se hunde un poco · foco de teclado: anillo · seleccionada: borde y fondo de acento.
 // tone: color de la franja izquierda (la severidad), para leer la cola de un vistazo.
-export default function AppSelectableCard({ selected = false, tone, onClick, label, children }) {
+// itemId: va en data-item-id (para devolver el foco y llevar la lista hasta la tarjeta seleccionada)
+export default function AppSelectableCard({ selected = false, tone, onClick, label, itemId, children }) {
   return (
     <Card
       role="listitem"
@@ -19,7 +20,7 @@ export default function AppSelectableCard({ selected = false, tone, onClick, lab
         containIntrinsicSize: `auto ${t.layout.ticketCardHeight}px`,
       })}
     >
-      <CardActionArea onClick={onClick} aria-pressed={selected} aria-label={label}
+      <CardActionArea onClick={onClick} aria-pressed={selected} aria-label={label} data-item-id={itemId}
                       sx={{ p: 1.75, pl: 2, height: '100%' }}>
         {children}
       </CardActionArea>

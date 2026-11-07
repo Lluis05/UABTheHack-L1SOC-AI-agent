@@ -8,7 +8,8 @@ export default function AppCardGrid({ columns = 'auto', label, children }) {
     <Box role="list" aria-label={label}
          sx={(t) => ({
            display: 'grid', gap: 1.25, alignContent: 'start',
-           gridTemplateColumns: single ? '1fr' : `repeat(auto-fill, minmax(${t.layout.ticketCardMinWidth}px, 1fr))`,
+           // min(100%, …): en un móvil de 320px la tarjeta se ajusta al ancho en vez de desbordar
+           gridTemplateColumns: single ? '1fr' : `repeat(auto-fill, minmax(min(100%, ${t.layout.ticketCardMinWidth}px), 1fr))`,
            ...(single ? { maxHeight: t.layout.queueMaxHeight, overflowY: 'auto', overscrollBehavior: 'contain', pr: 0.5 } : {}),
          })}>
       {children}

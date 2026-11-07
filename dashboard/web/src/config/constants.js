@@ -3,6 +3,8 @@
 
 export const POLL_DASHBOARD_MS = 10000
 export const POLL_TRIAGE_MS = 800
+// Cuánto se ve el aviso «N nuevos» tras un refresco que trae tickets
+export const NEW_ITEMS_NOTICE_MS = 20000
 export const MIN_JUSTIFICATION_LEN = 5
 export const APPROVER_STORAGE_KEY = 'approver'
 
@@ -38,7 +40,9 @@ export const PAGE = { QUEUE: 'queue', LIVE: 'live', INCIDENTS: 'incidents', CONT
 // Solo la severidad va rellena (variante solid): es lo primero que tiene que saltar a la vista
 export const SOLID_CHIP_KINDS = ['severity']
 
-// Etiqueta y tono (clave de la paleta del tema) de cada valor que se pinta como chip
+// Etiqueta, tono (clave de la paleta del tema) e icono opcional de cada valor que se pinta como chip.
+// Presupuesto de color: el color es de la severidad y de quién decidió (Política / IA / Persona). Estado y veredicto
+// van en gris y se distinguen por el icono; la única excepción es «Pendiente de aprobación», que pide una persona.
 export const CHIP_KINDS = {
   severity: {
     [SEVERITY.CRITICAL]: ['Crítica', 'sevCritical'],
@@ -48,16 +52,16 @@ export const CHIP_KINDS = {
     [SEVERITY.INFO]: ['Info', 'sevInfo'],
   },
   verdict: {
-    [VERDICT.TP]: ['Verdadero positivo', 'error'],
-    [VERDICT.BTP]: ['Benigno autorizado', 'success'],
-    [VERDICT.FP]: ['Falso positivo', 'sevInfo'],
-    [VERDICT.MORE_INFO]: ['Falta información', 'warning'],
+    [VERDICT.TP]: ['Verdadero positivo', 'default', 'threat'],
+    [VERDICT.BTP]: ['Benigno autorizado', 'default', 'authorized'],
+    [VERDICT.FP]: ['Falso positivo', 'default', 'dismiss'],
+    [VERDICT.MORE_INFO]: ['Falta información', 'default', 'help'],
   },
   status: {
-    [STATUS.AWAITING]: ['Pendiente de aprobación', 'warning'],
-    [STATUS.ESCALATED]: ['Escalada', 'sevHigh'],
-    [STATUS.TRIAGED]: ['Triada', 'info'],
-    [STATUS.CLOSED]: ['Cerrada', 'sevInfo'],
+    [STATUS.AWAITING]: ['Pendiente de aprobación', 'warning', 'pending'],
+    [STATUS.ESCALATED]: ['Escalada', 'default', 'escalation'],
+    [STATUS.TRIAGED]: ['Triada', 'default', 'done'],
+    [STATUS.CLOSED]: ['Cerrada', 'default', 'closedTicket'],
   },
   decider: {
     [DECIDER.POLICY]: ['Política', 'policy'],
@@ -85,12 +89,14 @@ export const CHIP_HINTS = {
 
 export const STEP_LABELS = { context: 'Contexto', policy: 'Política', llm: 'IA', reviewer: 'Revisor', ticket: 'Ticket' }
 
+// icon: el de la navegación inferior en móvil
 export const PAGES = [
-  { value: PAGE.QUEUE, label: 'Tickets' },
-  { value: PAGE.LIVE, label: 'Upload' },
-  { value: PAGE.INCIDENTS, label: 'Incidentes' },
-  { value: PAGE.CONTAINMENT, label: 'Acciones' },
+  { value: PAGE.QUEUE, label: 'Tickets', icon: 'queue' },
+  { value: PAGE.LIVE, label: 'Upload', icon: 'upload' },
+  { value: PAGE.INCIDENTS, label: 'Incidentes', icon: 'incidents' },
+  { value: PAGE.CONTAINMENT, label: 'Acciones', icon: 'containment' },
 ]
+export const NAV_LABEL = 'Secciones'
 
 export const APP_TITLE = 'Tarvia'
 
@@ -131,4 +137,43 @@ export const INPUT_MODES = [
   { value: INPUT_MODE.FILE, label: 'Subir fichero' },
   { value: INPUT_MODE.IDS, label: 'IDs del dataset' },
   { value: INPUT_MODE.RANDOM, label: 'Simulacro aleatorio' },
+]
+
+// Columnas ajustables y plegables (cola | ficha | asistente). Anchos en px; se recuerdan en el navegador por página.
+export const PANE_LIMITS = { leftMin: 240, asideMin: 320, centerMin: 420, step: 24 }
+export const PANE_DEFAULTS = { leftWidth: 380, asideWidth: 440, leftCollapsed: false, asideCollapsed: false }
+export const PANE_LAYOUT_KEY = { QUEUE: 'panes:queue', INCIDENTS: 'panes:incidents' }
+// Por debajo de este ancho la cola usa tarjetas compactas (solo título, severidad y confianza)
+export const COMPACT_QUEUE_BELOW_PX = 340
+
+// Orden de la cola: {key, direction}. key es «priority» (primero lo que espera a una persona, luego severidad, luego
+// lo más reciente) o una columna de la tabla (SORT_KEY). El primer clic en una cabecera ordena de mayor a menor.
+export const SORT_DIR = { DESC: 'desc', ASC: 'asc' }
+export const SORT_KEY = {
+  SEVERITY: 'severity', ID: 'ticket_id', TITLE: 'title', STATUS: 'status', VERDICT: 'verdict', DECIDER: 'decider',
+  INCIDENT: 'incident', CONFIDENCE: 'confidence', TIME: 'time',
+}
+export const QUEUE_SORT = { PRIORITY: 'priority', RECENT: SORT_KEY.TIME, SEVERITY: SORT_KEY.SEVERITY }
+export const DEFAULT_QUEUE_SORT = { key: QUEUE_SORT.PRIORITY, direction: SORT_DIR.DESC }
+// Atajos del selector «Orden» (en móvil no hay cabeceras de tabla); siempre de mayor a menor
+export const QUEUE_SORTS = [
+  { value: QUEUE_SORT.PRIORITY, label: 'Prioridad' },
+  { value: QUEUE_SORT.RECENT, label: 'Más recientes' },
+  { value: QUEUE_SORT.SEVERITY, label: 'Severidad' },
+]
+// Lo que muestra el selector cuando el orden viene de una cabecera de la tabla
+export const CUSTOM_SORT_LABEL = 'Por columna'
+
+// Campo de búsqueda de la cola (el atajo «/» le da el foco) y título del detalle (recibe el foco al abrir un ticket)
+export const QUEUE_SEARCH_ID = 'queue-search'
+export const DETAIL_TITLE_ID = 'ticket-detail-title'
+
+// Atajos de teclado (se ignoran mientras se escribe en un campo o hay un diálogo abierto)
+export const SHORTCUTS = [
+  { keys: ['j', 'k'], label: 'Siguiente / anterior ticket de la cola' },
+  { keys: ['Esc'], label: 'Cerrar el detalle y volver a la cola' },
+  { keys: ['/'], label: 'Buscar en la cola' },
+  { keys: ['i'], label: 'Abrir o cerrar el asistente IA del ticket' },
+  { keys: ['v'], label: 'Ver toda la información del ticket' },
+  { keys: ['?'], label: 'Mostrar esta ayuda' },
 ]

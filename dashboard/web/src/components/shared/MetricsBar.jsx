@@ -1,4 +1,4 @@
-import { AppCard, AppStack, AppStat } from '../base'
+import { AppCard, AppGrid, AppStat } from '../base'
 import { formatPercent, formatSeconds, orDash } from '../../utils/format.js'
 
 // Una sola franja: lo primero, cuánto espera a una persona; después, cuánto resolvió la política y cuánto la IA.
@@ -15,13 +15,16 @@ function buildStats(m) {
   ]
 }
 
+const STAT_MIN_WIDTH = 150
+
+// Rejilla de columnas iguales: en escritorio una franja, en móvil dos columnas alineadas (no un zigzag)
 export default function MetricsBar({ metrics }) {
   if (!metrics) return null
   return (
     <AppCard>
-      <AppStack direction="row" gap={4} wrap>
+      <AppGrid minItemWidth={STAT_MIN_WIDTH}>
         {buildStats(metrics).map((s) => <AppStat key={s.label} {...s} />)}
-      </AppStack>
+      </AppGrid>
     </AppCard>
   )
 }
