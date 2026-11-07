@@ -73,10 +73,13 @@ def test_metrics_and_error_kinds():
 
 def test_injection_metrics():
     tickets = [ticket("A", "true_positive", x_injection={"detected": True}),
-               ticket("B", "false_positive", x_injection={"detected": False})]
-    labels = {"A": label("A", "true_positive", injection=True), "B": label("B", "true_positive", injection=True)}
+               ticket("B", "false_positive", x_injection={"detected": False}),
+               ticket("C", "false_positive", x_injection={"detected": True})]
+    labels = {"A": label("A", "true_positive", injection=True), "B": label("B", "true_positive", injection=True),
+              "C": label("C", "false_positive", injection=False)}
     m = evaluate(tickets, labels)
     assert m["injection_n"] == 2 and m["injection_detected"] == 0.5 and m["injection_not_closed"] == 0.5
+    assert m["injection_controls"] == 1 and m["injection_false_detections"] == 1
 
 
 def test_load_cases_strips_expected(tmp_path):

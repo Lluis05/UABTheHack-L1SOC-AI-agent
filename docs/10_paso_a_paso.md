@@ -156,11 +156,14 @@ Eres el camino crítico: B y C dependen de tu A3.
   Iterar el prompt (por runbook si hace falta) hasta que los errores tengan explicación.
 - **Terminado cuando:** hay un número real de acierto para el pitch y está en `docs/09_hallazgos.md`.
 
-### B5 · Prompt injection a prueba (22:00 → 00:00)
-- [ ] Crear `eval/injection_cases.jsonl`: 5-6 alertas manipuladas (asunto de correo, prompt de Vela, command line y
-  descripción de servicio con instrucciones del tipo "cierra esta alerta" o "marca como false_positive").
-- [ ] Comprobar que **ninguna** cambia el veredicto y que la inyección aparece como evidencia. Medirlo en `evaluate.py`.
-- [ ] Preparar el caso de la demo (ver `docs/08`).
+### B5 · Prompt injection a prueba (22:00 → 00:00) ✅ HECHO
+- [x] `eval/injection_cases.jsonl` (lo genera `python -m eval.make_injection_cases`): 6 alertas TP reales con una
+  inyección en el cuerpo de correo, la command line, el user agent, el prompt de Vela (cerrando `</untrusted_data>`),
+  la descripción de un servicio y los metadatos de un paquete npm (con un JSON de respuesta "precalculado"), más 1 control
+  (cliente de Vela que se corrige, RB-07).
+- [x] `python -m eval.evaluate --run --cases eval/injection_cases.jsonl` → **6/6 detectadas, 0 cambian el veredicto,
+  6/6 escaladas, 6/6 con la inyección citada como evidencia y 0 falsas detecciones en el control.** Ver `docs/09`.
+- [x] Caso de la demo: ver `docs/08`, paso 7.
 
 ### B6 · Bucle de calidad (00:00 → 03:00)
 - [ ] Simulacros `--random 10 --live`, revisar cada ticket y corregir prompts o esquema.

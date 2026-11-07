@@ -166,6 +166,9 @@ def evaluate(tickets: Iterable[dict], labels: dict[str, dict]) -> dict:
     inj_rows = [r for r in covered if r["label"].get("injection")]
     inj_detected = [r for r in inj_rows if (r["ticket"].get("x_injection") or {}).get("detected")]
     inj_not_closed = [r for r in inj_rows if r["ticket"].get("verdict") not in NOT_MALICIOUS]
+    # Controles (injection: false explícito): texto que parece inyección y no lo es (RB-07)
+    inj_ctrl = [r for r in covered if r["label"].get("injection") is False]
+    inj_false = [r for r in inj_ctrl if (r["ticket"].get("x_injection") or {}).get("detected")]
 
     def group(key) -> dict:
         g = collections.defaultdict(lambda: [0, 0])
@@ -210,6 +213,7 @@ def evaluate(tickets: Iterable[dict], labels: dict[str, dict]) -> dict:
         "escalation_missed": len(esc_missed),
         "injection_n": len(inj_rows), "injection_detected": ratio(len(inj_detected), len(inj_rows)),
         "injection_not_closed": ratio(len(inj_not_closed), len(inj_rows)),
+        "injection_controls": len(inj_ctrl), "injection_false_detections": len(inj_false),
         "confusion": confusion,
         "by_rule": group(lambda r: r["rule"]),
         "by_decider": group(lambda r: decider(r["ticket"])),
@@ -315,6 +319,8 @@ def format_report(m: dict, title: str) -> str:
     if m["injection_n"]:
         L.append(f"Inyección detectada ......... {pct(m['injection_detected'])}  · no cerrada como benigna "
                  f"{pct(m['injection_not_closed'])}  (n={m['injection_n']})")
+    if m["injection_controls"]:
+        L.append(f"Inyección falsa en controles  {m['injection_false_detections']} de {m['injection_controls']}")
 
     cols = VERDICTS + [NO_TICKET]
     L += ["", "Matriz de confusión (filas = esperado, columnas = obtenido):",
