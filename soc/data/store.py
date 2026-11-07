@@ -19,6 +19,7 @@ import logging
 import pickle
 import threading
 import time
+from bisect import bisect_left, bisect_right
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,7 @@ from soc import config
 
 log = logging.getLogger(__name__)
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 # Fuente -> fichero dentro de 04_logs/
 LOG_FILES: dict[str, str] = {
@@ -76,6 +77,15 @@ def _read(path: Path) -> list[dict]:
 def event_ts(e: dict) -> str:
     """Timestamp ISO UTC del evento (cloudtrail puede traer eventTime)."""
     return e.get("timestamp") or e.get("eventTime") or ""
+
+
+def _ts_distance(a: str, b: str) -> float:
+    from soc.timeutil import parse
+
+    try:
+        return abs((parse(a) - parse(b)).total_seconds())
+    except ValueError:
+        return float("inf")
 
 
 class DataStore:
@@ -197,6 +207,38 @@ class DataStore:
         self._ti_by_value = {r["value"].lower(): r for r in self._ti}
         self._geo_by_ip = {r["ip"]: r for r in self._geo}
         self._sbx_by_hash = {r["sha256"].lower(): r for r in self._sbx}
+        self._build_entity_index()
+
+    def _build_entity_index(self) -> None:
+        """Índice invertido: clave canónica → eventos (y alertas) ordenados por tiempo.
+
+        _ent_ts[key] y _ent_ev[key] son listas paralelas (timestamps y eventos) para usar bisect.
+        """
+        from soc.enrich.entities import entity_keys, event_keys, extract_entities
+
+        t = time.perf_counter()
+        idx: dict[str, list] = {}
+        for rows in self.logs.values():  # cada fuente ya está ordenada por tiempo
+            for e in rows:
+                ts = event_ts(e)
+                for k in event_keys(e, self):
+                    idx.setdefault(k, []).append((ts, e))
+        self._ent_ts: dict[str, list[str]] = {}
+        self._ent_ev: dict[str, list[dict]] = {}
+        for k, post in idx.items():
+            post.sort(key=lambda p: p[0])
+            self._ent_ts[k] = [p[0] for p in post]
+            self._ent_ev[k] = [p[1] for p in post]
+        self.load_stats["entity_index_s"] = round(time.perf_counter() - t, 1)
+
+        aidx: dict[str, list] = {}
+        self._alert_entities: dict[str, dict] = {}
+        for a in self._alert_by_id.values():
+            ents = extract_entities(a, self)
+            self._alert_entities[a["alert_id"]] = ents
+            for k in entity_keys(ents):
+                aidx.setdefault(k, []).append((a.get("created_at", ""), a["alert_id"]))
+        self._alert_idx: dict[str, list[tuple[str, str]]] = {k: sorted(v) for k, v in aidx.items()}
 
     # ------------------------------------------------------------ consultas
     def alerts(self, sample: bool = False) -> list[dict]:
@@ -259,7 +301,67 @@ class DataStore:
             **self.load_stats,
         }
 
-    # A2: search() y alerts_for_entity() (índice invertido por entidad)
+    # ------------------------------------------------- búsqueda por entidad (A2)
+    def entities_of(self, alert: dict) -> dict[str, list[str]]:
+        """Entidades normalizadas de una alerta (precalculadas si es del dataset)."""
+        from soc.enrich.entities import extract_entities
+
+        cached = self._alert_entities.get(alert.get("alert_id", ""))
+        return cached if cached is not None and alert is self._alert_by_id.get(alert.get("alert_id")) \
+            else extract_entities(alert, self)
+
+    def entity_count(self, entity: str) -> int:
+        """Nº total de eventos que mencionan la entidad (sirve para detectar entidades 'hub')."""
+        from soc.enrich.entities import canon
+
+        return len(self._ent_ts.get(canon(entity, self), ()))
+
+    def search(self, entity: str, start: str | None = None, end: str | None = None,
+               sources: list[str] | None = None, limit_per_source: int = 50,
+               around: str | None = None) -> dict[str, list[dict]]:
+        """Eventos que mencionan `entity` entre start y end (ISO UTC), agrupados por fuente.
+
+        Si hay más de `limit_per_source` en una fuente, se quedan los más cercanos a `around`
+        (o los primeros si no se pasa). Cada lista sale ordenada por tiempo.
+        """
+        from soc.enrich.entities import canon
+
+        key = canon(entity, self)
+        ts_list = self._ent_ts.get(key)
+        if not ts_list:
+            return {}
+        lo = bisect_left(ts_list, start) if start else 0
+        hi = bisect_right(ts_list, end) if end else len(ts_list)
+        # Entidades "hub" (miles de eventos): acotar a los más cercanos a `around` por posición,
+        # para no ordenar decenas de miles de eventos.
+        n_src = len(sources) if sources else len(LOG_FILES)
+        cap = max(2000, limit_per_source * n_src * 4)
+        if hi - lo > cap:
+            mid = bisect_left(ts_list, around, lo, hi) if around else lo + cap // 2
+            lo, hi = max(lo, mid - cap // 2), min(hi, max(lo, mid - cap // 2) + cap)
+        evs = self._ent_ev[key]
+        by_src: dict[str, list[dict]] = {}
+        for i in range(lo, hi):
+            e = evs[i]
+            if sources and e["_source"] not in sources:
+                continue
+            by_src.setdefault(e["_source"], []).append(e)
+        for src, lst in by_src.items():
+            if len(lst) > limit_per_source:
+                if around:
+                    lst = sorted(lst, key=lambda e: _ts_distance(event_ts(e), around))[:limit_per_source]
+                    lst.sort(key=event_ts)
+                else:
+                    lst = lst[:limit_per_source]
+                by_src[src] = lst
+        return by_src
+
+    def alerts_for_entity(self, entity: str, start: str | None = None, end: str | None = None) -> list[str]:
+        """IDs de alertas del dataset que comparten la entidad, en orden temporal."""
+        from soc.enrich.entities import canon
+
+        post = self._alert_idx.get(canon(entity, self), [])
+        return [aid for ts, aid in post if (not start or ts >= start) and (not end or ts <= end)]
 
 
 _STORE: DataStore | None = None

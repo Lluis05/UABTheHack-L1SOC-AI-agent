@@ -21,7 +21,17 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
 - UC-EML-001: newsletters legítimas reportadas como phishing (p. ej., `news.zalando.example`).
 
 ## Incidentes sospechosos (por investigar)
-- …
+- (Lluis 13:10) **Posible fraude de IBAN (BEC):** alerta UC-EML-004. Correo de `laura.ferrer2@tarvia.example` a
+  `jordi.serra2` (Tesorería) **enviado desde la IP externa 203.0.113.45**, con el adjunto `Certificado_titularidad_Montroig.pdf`
+  y message-id `<CAF8x9-bec-0001@tarvia.example>`. ¿Es una cuenta interna comprometida o un remitente suplantado? Revisar
+  los idp_signins de laura.ferrer2 y si jordi.serra2 estaba de vacaciones (26-30/10).
+- (Lluis 13:10) **Posible cadena phishing → ejecución → robo de credenciales:** marta.puig recibe `Pedido_Q4_2026.zip`
+  (con un `.js` dentro) de `pedidos@pedidos-hilaturas-alcoi.example` (sender_ip 81.28.167.30) el 09/10. Hay alerta UC-EDR-004
+  (**LSASS**) en **WS-BCN-1770** con `marta.puig` y `adm.aortega` (cuenta admin, ¡que solo puede usarse desde JUMP01!).
+  También hay un `wscript.exe ...Pedido_Q4_2026.js` en entidades de proceso. Para D: reconstruir la cronología.
+- (Lluis 13:10) UC-CLD-002: `svc_ecom_deploy` crea el usuario IAM `backup-sync` desde **2.57.121.25** (IP pública real).
+  Después hay un UC-CLD-004 de `backup-sync` sobre `tarvia-backups-prod`. Posible cadena CI/CD → AWS → exfiltración.
+- (Lluis 13:10) UC-AI-002: sesión `ai-c07inj0001`. El cliente C700675 intenta acceder a datos del cliente C712944 (víctima) a través de Vela.
 
 ## Prompt injection observada en los datos
 - UC-AI-001: hay prompts de clientes que activan el guardarraíl sin ser maliciosos (p. ej., "Ignora lo anterior, me

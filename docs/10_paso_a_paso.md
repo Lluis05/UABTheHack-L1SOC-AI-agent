@@ -42,7 +42,7 @@ Eres el camino crítico: B y C dependen de tu A3.
 - **Terminado cuando:** `python -c "from soc.data.store import DataStore; s=DataStore(...); print(s.event('EDR-0005329'), s.asset('WS-BCN-1174'), s.user('alejandro.ruiz'))"` funciona y medimos el tiempo de carga (en frío y desde la caché).
 - **Prompt:** *"Implementa A1 de docs/10_paso_a_paso.md siguiendo el contrato DataStore de docs/04. Mide tiempos de carga."*
 
-### A2 · Índice por entidad y búsqueda temporal (14:00 → 15:00)
+### A2 · Índice por entidad y búsqueda temporal (14:00 → 15:00) ✅ HECHO (13:10)
 - **Archivos:** `soc/data/store.py`, `soc/enrich/entities.py`.
 - **Qué:**
   - `entities.py`: `extract_entities(alert) -> dict` que normaliza `entities` + `evidence` a
