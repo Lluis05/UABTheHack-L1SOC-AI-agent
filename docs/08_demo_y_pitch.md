@@ -13,6 +13,7 @@
 
 ### Checklist antes de la defensa
 - [ ] DataStore precargado: el dashboard abierto y caliente **antes** de empezar.
+- [ ] **Entrada de la defensa: el JSON que nos den** → subirlo en el dashboard (Triaje en directo → fichero) o `python -m soc.pipeline --file <json> --live`. Cualquier formato de JSON vale.
 - [ ] API simulada levantada (`uvicorn mock_soc_api:app --port 8000` en `06_herramientas`). **Obligatorio:** las alertas se leen de la API (lo pidió Deloitte) y la contención se ejecuta en ella. La CLI dice al empezar si está disponible.
 - [ ] `claude` logueado y con cuota disponible. Gemini probado.
 - [ ] Simulacro `--random 10 --live` hecho en el mismo portátil y la misma red, en menos de 2 minutos.

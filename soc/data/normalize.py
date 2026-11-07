@@ -9,6 +9,7 @@ queda anotada en `alert["x_input_warnings"]` (sale en el ticket). Nunca lanza ex
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -101,6 +102,61 @@ def _entities(v: Any, warnings: list[str]) -> tuple[dict, list[str]]:
         if good:
             out[str(k)] = good
     return out, []
+
+
+WRAPPER_KEYS = ("alerts", "items", "data", "results", "alertas", "records")
+
+
+def unwrap_alerts(value: Any) -> list:
+    """Lista de alertas desde lo que nos den: lista, alerta suelta o envoltorio ({"alerts": [...]}, el formato
+    de la API {"total":…, "items": [...]}, {"data": {...}}…). Recursivo y tolerante."""
+    if isinstance(value, list):
+        out = []
+        for v in value:
+            out += unwrap_alerts(v) if isinstance(v, (list, dict)) and _is_wrapper(v) else [v]
+        return out
+    if isinstance(value, dict):
+        if _is_wrapper(value):
+            for k in WRAPPER_KEYS:
+                if isinstance(value.get(k), (list, dict)):
+                    return unwrap_alerts(value[k])
+        return [value]
+    return [value] if value not in (None, "") else []
+
+
+def _is_wrapper(v: Any) -> bool:
+    if isinstance(v, list):
+        return True
+    return (isinstance(v, dict) and "alert_id" not in v and "rule_id" not in v
+            and any(isinstance(v.get(k), (list, dict)) for k in WRAPPER_KEYS))
+
+
+def parse_alerts_text(text: str) -> tuple[list, list[str]]:
+    """Alertas desde texto: JSON (array, objeto, envoltorio, pretty-printed), JSONL u objetos concatenados.
+    Devuelve (alertas, avisos). Un fragmento ilegible se salta con aviso; nunca lanza excepción."""
+    text = (text or "").lstrip("﻿").strip()
+    if not text:
+        return [], []
+    try:
+        return unwrap_alerts(json.loads(text)), []
+    except json.JSONDecodeError:
+        pass
+    dec, i, out, warns = json.JSONDecoder(), 0, [], []
+    while i < len(text):
+        while i < len(text) and text[i] in " \t\r\n,":
+            i += 1
+        if i >= len(text):
+            break
+        try:
+            v, i = dec.raw_decode(text, i)
+            out += unwrap_alerts(v)
+        except json.JSONDecodeError:
+            line_end = text.find("\n", i)
+            line_end = len(text) if line_end < 0 else line_end
+            warns.append(f"fragmento JSON ilegible saltado (línea {text.count(chr(10), 0, i) + 1}): "
+                         f"{text[i:line_end][:80]!r}")
+            i = line_end + 1
+    return out, warns
 
 
 def normalize_alert(raw: Any, index: int = 0) -> dict:

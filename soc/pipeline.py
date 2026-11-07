@@ -41,7 +41,7 @@ from typing import Callable, Iterable
 
 from soc import config
 from soc.data.api import HybridStore, SocApi, SocApiError, get_api
-from soc.data.normalize import normalize_alert
+from soc.data.normalize import normalize_alert, parse_alerts_text, unwrap_alerts
 from soc.data.store import DataStore, get_store
 from soc.enrich.context import build_context
 from soc.enrich.entities import entity_keys
@@ -58,18 +58,21 @@ DEDUP_WINDOW_S = 3600
 
 # ------------------------------------------------------------------ entrada
 def load_alert_file(path: str | Path) -> list[dict]:
-    """JSONL o array JSON de alertas. Las que no traen alert_id reciben uno."""
-    text = Path(path).read_text(encoding="utf-8").strip()
-    if not text:
-        return []
-    if text.startswith("["):
-        alerts = json.loads(text)
-    elif text.startswith("{") and "\n" not in text.strip():
-        alerts = [json.loads(text)]
-    else:
-        alerts = [json.loads(line) for line in text.splitlines() if line.strip()]
+    """Alertas del JSON que nos den (array, objeto, envoltorio {"alerts"/"items": [...]}, pretty-printed,
+    JSONL u objetos concatenados; con o sin BOM). Lo ilegible se salta con aviso; nunca rompe."""
+    raw = Path(path).read_bytes()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+        log.warning("%s no es UTF-8: leído como latin-1", path)
+    alerts, warns = parse_alerts_text(text)
+    for w in warns:
+        log.warning("%s: %s", Path(path).name, w)
+    alerts = [a if isinstance(a, dict) else {"evidence": {"text": str(a)}} for a in alerts]
     for i, a in enumerate(alerts):
-        a.setdefault("alert_id", f"ALR-NUEVA-{i + 1:04d}")
+        if not a.get("alert_id"):
+            a["alert_id"] = f"ALR-NUEVA-{i + 1:04d}"
         a.setdefault("status", "new")
     return alerts
 
@@ -314,7 +317,9 @@ def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, 
     """Punto de entrada del dashboard (contrato docs/04): tría en directo, IA en todas, progreso paso a paso."""
     store = get_store()
     api = get_api()
-    sel = [_tag(a, "dashboard (alerta pegada)") for a in alerts or []]
+    # El dashboard puede mandar un envoltorio ({"alerts": [...]}, formato de la API…) como si fuera una alerta
+    sel = [_tag(a if isinstance(a, dict) else {"evidence": {"text": str(a)}}, "dashboard (alerta pegada)")
+           for a in unwrap_alerts(list(alerts or []))]
     for i, a in enumerate(sel):
         a.setdefault("alert_id", f"ALR-NUEVA-{i + 1:04d}")
     if ids:

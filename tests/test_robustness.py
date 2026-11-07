@@ -82,3 +82,45 @@ def test_batch_metrics_keys_for_dashboard():
               "decided_by_policy_pct", "pending_ai", "top_rules_pending_ai"):
         assert k in m
     assert m["total"] == 150 and m["decided_by_policy"] + m["pending_ai"] == m["tickets"]
+
+
+ONE = {"alert_id": "ALR-J-1", "rule_id": "UC-EDR-001", "severity": "high", "created_at": "2026-11-08T09:00:00Z"}
+TWO = {"alert_id": "ALR-J-2", "rule_id": "UC-WEB-001", "severity": "low", "created_at": "2026-11-08T09:01:00Z"}
+
+
+@pytest.mark.parametrize("name,content", [
+    ("array", json.dumps([ONE, TWO])),
+    ("array_pretty", json.dumps([ONE, TWO], indent=2)),
+    ("jsonl", json.dumps(ONE) + "\n" + json.dumps(TWO) + "\n"),
+    ("jsonl_crlf_blank", json.dumps(ONE) + "\r\n\r\n" + json.dumps(TWO)),
+    ("wrapper_alerts", json.dumps({"alerts": [ONE, TWO]})),
+    ("api_format", json.dumps({"total": 2, "items": [ONE, TWO]}, indent=2)),
+    ("nested_data", json.dumps({"data": {"alerts": [ONE, TWO]}})),
+    ("concatenated_pretty", json.dumps(ONE, indent=2) + "\n" + json.dumps(TWO, indent=2)),
+    ("bom", "\ufeff" + json.dumps([ONE, TWO])),
+    ("bad_line_skipped", json.dumps(ONE) + "\n{esto no es json\n" + json.dumps(TWO)),
+])
+def test_given_json_in_any_shape(name, content, tmp_path):
+    from soc.pipeline import load_alert_file
+
+    f = tmp_path / "defensa.json"
+    f.write_text(content, encoding="utf-8")
+    assert [a["alert_id"] for a in load_alert_file(f)] == ["ALR-J-1", "ALR-J-2"]
+
+
+def test_single_pretty_object(tmp_path):
+    from soc.pipeline import load_alert_file
+
+    f = tmp_path / "una.json"
+    f.write_text(json.dumps(ONE, indent=2), encoding="utf-8")
+    assert [a["alert_id"] for a in load_alert_file(f)] == ["ALR-J-1"]
+
+
+def test_dashboard_wrapper_is_unwrapped(monkeypatch, tmp_path):
+    import soc.pipeline as p
+    from soc import config
+
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(agent, "cached_complete", _valid_llm)
+    tickets = p.triage_live(alerts=[{"total": 2, "items": [ONE, TWO]}])
+    assert sorted(t["alert_ids"][0] for t in tickets) == ["ALR-J-1", "ALR-J-2"]
