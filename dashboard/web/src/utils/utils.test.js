@@ -8,6 +8,7 @@ import { alertElapsedSeconds, buildTriageRequest, parseAlerts, parseIds, stepSta
 import { countLabel, formatDateTime, formatPercent, initials, toPercent } from './format.js'
 import { chipProps, optionsFor } from './chips.js'
 import { buildSearch, readUrlState } from './url.js'
+import { incidentEntities, incidentTactics } from './incidents.js'
 
 const CONFIG = { api_actions: ['isolate_host', 'block_ioc'] }
 const rule = (allowed, requires_approval, approvers = []) => ({ allowed, requires_approval, approvers })
@@ -143,5 +144,16 @@ describe('rediseño: filtros, tags y avatar', () => {
   it('saca las iniciales del nombre', () => {
     expect(initials('  ana  garcía lópez ')).toBe('AG')
     expect(initials('')).toBe('')
+  })
+})
+
+describe('incidentes', () => {
+  it('aplana las entidades sin repetir', () => {
+    expect(incidentEntities({ entities: { hosts: ['H1'], ips: ['1.2.3.4', 'H1'], users: null } })).toEqual(['H1', '1.2.3.4'])
+    expect(incidentEntities()).toEqual([])
+  })
+  it('usa x_tactics y si no, las tácticas de la cadena sin repetir', () => {
+    expect(incidentTactics({ x_tactics: ['A'], kill_chain: [{ tactic: 'B' }] })).toEqual(['A'])
+    expect(incidentTactics({ kill_chain: [{ tactic: 'B' }, { tactic: 'C' }, { tactic: 'B' }] })).toEqual(['B', 'C'])
   })
 })

@@ -8,6 +8,7 @@ import AppIcon from './AppIcon.jsx'
 
 const ICON_COL = 36
 const LABEL_COL = 118
+const ACTION_COL = 64
 // Cabecera solo para lectores de pantalla (las columnas de icono y acción no necesitan título visible)
 const visuallyHidden = { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }
 
@@ -15,13 +16,13 @@ const visuallyHidden = { position: 'absolute', width: '1px', height: '1px', over
 // rows: [{key, icon, label, value, action?}]
 export default function AppKeyValueTable({ rows, label }) {
   return (
-    <Table size="small" aria-label={label} sx={{ '& td': { py: 0.9, verticalAlign: 'middle' } }}>
+    <Table size="small" aria-label={label} sx={{ tableLayout: 'fixed', '& td': { py: 0.9, verticalAlign: 'middle' } }}>
       <TableHead>
         <TableRow>
           <TableCell sx={{ width: ICON_COL }}><Box component="span" sx={visuallyHidden}>Icono</Box></TableCell>
           <TableCell sx={{ width: LABEL_COL, color: 'text.secondary' }}>Campo</TableCell>
           <TableCell sx={{ color: 'text.secondary' }}>Valor</TableCell>
-          <TableCell sx={{ width: '1%' }}><Box component="span" sx={visuallyHidden}>Más</Box></TableCell>
+          <TableCell sx={{ width: ACTION_COL }}><Box component="span" sx={visuallyHidden}>Más</Box></TableCell>
         </TableRow>
       </TableHead>
       <TableBody>

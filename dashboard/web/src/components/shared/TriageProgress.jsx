@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AppAccordion, AppAlert, AppButton, AppCard, AppChip, AppCodeBlock, AppStack, AppText } from '../base'
+import { AppAccordion, AppAlert, AppButton, AppCard, AppChip, AppCodeBlock, AppFixedArea, AppStack, AppText } from '../base'
 import { JOB_STATUS, STEP, STEP_LABELS } from '../../config/constants.js'
 import { countLabel } from '../../utils/format.js'
 import { alertElapsedSeconds, stepStates, summarizeJob } from '../../utils/triage.js'
@@ -27,7 +27,9 @@ export default function TriageProgress({ job, targetSeconds, children }) {
         <AppText variant="caption" tone="muted">Motor: {job.mode}</AppText>
         {overTarget ? <AppAlert tone="warning">Ha tardado más que el objetivo de la defensa ({targetSeconds}&nbsp;s).</AppAlert> : null}
         {job.error ? <AppAlert tone="error">El triaje ha fallado: {job.error}. Revisa el log del pipeline.</AppAlert> : null}
-        {children}
+        <AppFixedArea height="uploadProgressHeight" label="Alertas del lanzamiento">
+          <AppStack gap={1}>{children}</AppStack>
+        </AppFixedArea>
         {job.log?.length > 0 ? (
           <AppAccordion title={`Log del pipeline (${job.log.length} líneas)`}>
             <AppCodeBlock>{job.log.join('\n')}</AppCodeBlock>

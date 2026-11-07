@@ -67,6 +67,8 @@ export const theme = createTheme({
     ticketCardMinWidth: 320, ticketCardHeight: 168,
     // Modal de información extendida: alto fijo proporcional a la pantalla
     dialogLgHeight: '80vh',
+    // Upload: la zona de entrada y el progreso tienen alto fijo (no saltan al cambiar de modo ni al llegar alertas)
+    uploadInputHeight: 230, uploadProgressHeight: '45vh',
   },
   components: {
     MuiCssBaseline: {
@@ -81,7 +83,8 @@ export const theme = createTheme({
     // Variantes propias: bloque por defecto; AppText as="span" las fuerza a línea
     MuiTypography: { defaultProps: { variantMapping: { mono: 'div', metric: 'div', strong: 'p' } } },
     MuiButton: { defaultProps: { disableElevation: true, size: 'small' }, styleOverrides: { root: { textTransform: 'none', fontWeight: 600 } } },
-    MuiChip: { defaultProps: { size: 'small' }, styleOverrides: { root: { fontWeight: 600 } } },
+    // maxWidth: un hash o un dominio largo se corta con puntos suspensivos en vez de desbordar la página
+    MuiChip: { defaultProps: { size: 'small' }, styleOverrides: { root: { fontWeight: 600, maxWidth: '100%' } } },
     MuiTextField: { defaultProps: { size: 'small', autoComplete: 'off' } },
     MuiCard: { defaultProps: { variant: 'outlined' } },
     MuiTableCell: { styleOverrides: { root: { verticalAlign: 'top', wordBreak: 'break-word', ...TABULAR } } },

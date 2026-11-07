@@ -37,7 +37,7 @@ export default function App() {
           {nav.page === PAGE.LIVE ? (
             <LiveTriagePage health={data.health} config={config} onOpenTicket={openTicket} onTicketsChanged={data.refresh} />
           ) : null}
-          {nav.page === PAGE.INCIDENTS ? <IncidentsPage incidents={data.incidents} onOpenTicket={openTicket} /> : null}
+          {nav.page === PAGE.INCIDENTS ? <IncidentsPage incidents={data.incidents} tickets={data.tickets} onOpenTicket={openTicket} /> : null}
           {nav.page === PAGE.CONTAINMENT ? <ContainmentPage /> : null}
         </AppStack>
       </AppPage>
