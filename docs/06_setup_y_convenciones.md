@@ -35,6 +35,51 @@ Cuidado: la API simulada carga las 11.061 alertas al arrancar y carga cada log e
   como mínimo en cada punto de integración.
 - Antes de hacer push: `git pull --rebase origin main`.
 - **Nunca** `git push --force` a `main`.
+
+### Flujo obligatorio (los 3, y sus Claudes)
+**1. Cada persona tiene su propia rama.** Nadie hace commits directamente en `main`.
+| Persona | Rama |
+|---|---|
+| A · Lluis (datos y política) | `feat/data` |
+| B (IA y correlación) | `feat/agent` |
+| C · Adrián (dashboard, contención y pitch) | `feat/dashboard` |
+
+Si hace falta una rama extra (p. ej. `feat/pitch`), se crea a partir de `main` actualizado.
+
+**2. Antes de empezar a trabajar y antes de subir nada, SIEMPRE pull.**
+```bash
+git checkout main && git pull --rebase origin main     # main al día
+git checkout feat/<mi-rama>
+git rebase main                                       # traer a mi rama lo último de main
+```
+
+**3. Subir mi trabajo a mi rama.**
+```bash
+git add <ficheros concretos>                          # nada de `git add .` a ciegas
+git commit -m "Add alert queue view"
+git pull --rebase origin feat/<mi-rama>               # por si lo he tocado desde otro sitio
+git push origin feat/<mi-rama>
+```
+
+**4. Merge a `main` sin conflictos.** Solo cuando lo de tu rama funciona.
+```bash
+git checkout main && git pull --rebase origin main    # pull JUSTO antes del merge
+git checkout feat/<mi-rama> && git rebase main        # los conflictos se resuelven AQUÍ, en tu rama
+# probar que sigue funcionando (al menos `python -m soc.pipeline --random 10 --live` si aplica)
+git checkout main && git merge --ff-only feat/<mi-rama>
+git push origin main
+```
+- Si `git merge --ff-only` falla es que `main` ha cambiado mientras tanto: repetir el paso 4 desde el principio.
+- **Los conflictos nunca se resuelven en `main`.** Se resuelven en tu rama al hacer `rebase main`.
+- Si el conflicto toca ficheros de otra persona, **no lo resuelvas solo**: avisa a su dueño y decidid juntos.
+- Si el push a `main` es rechazado, `git pull --rebase origin main` y volver a probar. **Nunca** `--force`.
+- Avisa por el chat del equipo cuando hagas merge a `main` ("merge de feat/dashboard en main"), para que los
+  demás hagan pull.
+
+**5. Para reducir conflictos:**
+- Cada uno toca solo sus módulos (ver [05](05_reparto_y_plan.md)). Ficheros compartidos (`requirements.txt`,
+  `docs/`, `CLAUDE.md`, contratos de [04](04_arquitectura.md)): commits pequeños y merge rápido a `main`.
+- Commits pequeños y frecuentes; merges a `main` a menudo (mínimo en cada integración: 15:30, 19:00, 03:00).
 - Mensajes de commit cortos y en imperativo: `Add severity matrix`, `Fix asset lookup by IP`.
 - **Prohibido** añadir `Co-Authored-By: Claude` o "Generated with Claude Code". Solo deben aparecer los miembros del equipo.
 - No subir al repo: `.env`, `output/`, el dataset ni ficheros de base de datos (ya están en `.gitignore`).

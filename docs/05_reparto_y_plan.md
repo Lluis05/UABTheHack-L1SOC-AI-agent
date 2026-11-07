@@ -20,7 +20,7 @@ Es la base de todo y lo que más bloquea a los demás, así que va primero.
 - `eval/`: etiquetar a mano unas 40 alertas de la muestra y medir el acierto.
 - **Mientras A termina el contexto:** trabajar con 3-5 alertas reales construyendo el contexto a mano, o con stubs.
 
-### Persona C: Dashboard, contención y presentación
+### Persona C: Dashboard, contención y presentación (Adrián)
 - `dashboard/app.py` (Streamlit): cola de alertas con filtros, detalle del ticket, **traza de consultas**, evidencias,
   quién decidió cada cosa, vista de incidentes y botón **"Aprobar acción"** que llama a `POST /approvals` y luego a `POST /containment/{accion}`.
 - `dashboard/containment.py`: cliente de la API simulada.

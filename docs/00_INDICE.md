@@ -11,7 +11,7 @@ Pensada para que cada miembro del equipo se la pase a su Claude y podamos trabaj
 | [05_reparto_y_plan.md](05_reparto_y_plan.md) | Reparto de trabajo entre las 3 personas y plan horario hasta las 08:00 | Todos |
 | [06_setup_y_convenciones.md](06_setup_y_convenciones.md) | Instalación, variables de entorno, git, convenciones | Todos |
 | [07_llm.md](07_llm.md) | Capa LLM, prompts, defensa contra prompt injection, gestión de cuota | Persona B |
-| [08_demo_y_pitch.md](08_demo_y_pitch.md) | Guion de la demo, pitch y one-pager para dirección | Persona C (y todos al final) |
+| [08_demo_y_pitch.md](08_demo_y_pitch.md) | Guion de la demo, pitch y one-pager para dirección | Persona C · Adrián (y todos al final) |
 | [09_hallazgos.md](09_hallazgos.md) | Hallazgos sobre el dataset que vamos descubriendo (documento vivo) | Todos |
 
 **Repos:**
