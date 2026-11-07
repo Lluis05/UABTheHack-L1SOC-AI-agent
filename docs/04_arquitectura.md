@@ -172,10 +172,41 @@ El esquema de Deloitte (`ticket_salida.schema.json`) **más** campos propios con
  "summary":"...","severity":"high"}
 ```
 
+## Modo defensa en directo (REQUISITO DE DISEÑO PRINCIPAL)
+En la defensa nos dan **10 alertas al azar** y el sistema las tiene que triar **en directo**, delante del jurado.
+No vale tener nada precalculado: el triaje con IA se hace en el momento. Consecuencias:
+
+1. **El agente funciona alerta a alerta, en el momento.** Nada puede depender de un preproceso batch de horas.
+   El batch sobre las 11.061 alertas es un extra para las métricas, no una dependencia.
+2. **Las alertas pueden ser NUEVAS** (que no estén en `alertas.jsonl`). La entrada tiene que aceptar:
+   - IDs del dataset (`--ids ALR-...`),
+   - un fichero JSONL con alertas completas (`--file defensa.jsonl`),
+   - subir o pegar JSON en el dashboard.
+   Si una alerta nueva hace referencia a eventos que no tenemos, el sistema lo dice (`open_questions`) y no se rompe.
+3. **DataStore cargado una sola vez y en memoria ("caliente").** El dashboard lo carga al arrancar
+   (`st.cache_resource`) y lo reutiliza. Triar una alerta no puede implicar volver a leer 800.000 eventos.
+   - Objetivo: contexto determinista **< 1 s por alerta**. LLM unos 10-30 s.
+4. **Las 10 alertas se procesan en paralelo** (pool de 4-5 llamadas LLM simultáneas). Objetivo: **las 10 en menos de 2 minutos**.
+5. **En modo en vivo siempre se ejecuta el LLM**, también cuando el prefiltro ya tiene una decisión. El prefiltro
+   se le pasa como *hint* y el LLM confirma o discrepa. El jurado quiere ver razonar a la IA. En modo batch, el
+   prefiltro sí cierra solo el ruido evidente para ahorrar cuota.
+6. **Progreso visible en el dashboard:** cada alerta muestra en tiempo real el paso en que está (contexto → política → IA →
+   revisor → ticket) y la traza de consultas a medida que ocurren. Es la parte de "ver cómo la IA hace el triaje".
+7. **Robustez:** si Claude falla o se queda sin cuota, salta Gemini automáticamente. Si no hay red, se usa la caché
+   (`output/llm_cache/`) y, en último caso, el resultado determinista del prefiltro, **marcado como tal**.
+   La demo nunca puede quedarse colgada.
+8. **Cuota reservada para el domingo:** no gastar toda la suscripción de Claude por la noche. A partir de las 03:00 se
+   limitan las pruebas con LLM a simulacros de 10 alertas.
+
+**Simulacro:** `python -m soc.pipeline --random 10 --live` coge 10 alertas al azar de todo el dataset y las tría en
+paralelo midiendo el tiempo. Hay que ejecutarlo en cada punto de integración: es nuestra prueba de aceptación.
+
 ## Ejecución
 ```bash
 python -m soc.pipeline --sample                 # 150 alertas de desarrollo
-python -m soc.pipeline --ids ALR-...,ALR-...    # alertas concretas (¡las 10 de la defensa!)
-python -m soc.pipeline --all --no-llm           # todo el dataset solo con la parte determinista
+python -m soc.pipeline --ids ALR-...,ALR-... --live   # alertas concretas (¡las 10 de la defensa!)
+python -m soc.pipeline --file defensa.jsonl --live    # alertas nuevas desde fichero
+python -m soc.pipeline --random 10 --live             # SIMULACRO de la defensa (cronometrado)
+python -m soc.pipeline --all --no-llm                 # todo el dataset solo con la parte determinista (métricas)
 streamlit run dashboard/app.py
 ```

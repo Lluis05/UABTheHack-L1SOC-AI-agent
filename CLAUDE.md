@@ -23,6 +23,7 @@ Equipo de 3 personas, cada una con su propio Claude. **Entrega: domingo 8 de nov
 - **Severidad:** la calcula **código determinista** (`soc/policy/severity.py`) con la matriz de la política. El LLM
   nunca decide la severidad por su cuenta; puede proponer ajustes justificados, que el código valida.
 - **Contención:** el LLM **nunca** tiene acceso a endpoints de contención. Solo el humano desde el dashboard.
+- **Defensa en directo:** el jurado elige 10 alertas al azar y se tría EN EL MOMENTO. Todo diseño debe permitir triar una alerta nueva en segundos (ver "Modo defensa en directo" en docs/04_arquitectura.md).
 - **Cuota LLM:** usamos la suscripción de Claude Code (+ Gemini gratis de fallback). No lances el LLM sobre las
   11.061 alertas. Usa la muestra de 150 y el prefiltro determinista (ver `docs/07_llm.md`).
 - Código en Python 3.11, comentarios y docs en castellano, nombres de variables en inglés.

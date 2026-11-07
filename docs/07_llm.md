@@ -13,6 +13,13 @@ result, provider = complete(system_prompt, user_prompt, json_schema)   # result:
 
 El orden se cambia con `LLM_PROVIDERS` en `.env`. Cada llamada tarda unos 5-30 s.
 
+## Modo en vivo (defensa)
+- Las 10 alertas de la defensa se tría **en directo**: lanzar 4-5 llamadas `complete()` en paralelo con
+  `concurrent.futures.ThreadPoolExecutor` (cada llamada es un subproceso, así que funciona bien con hilos).
+- Timeout por llamada de unos 90 s. Si se supera, se pasa a Gemini y, si también falla, se muestra el ticket determinista marcado como "sin IA".
+- Probar antes de la defensa que Gemini funciona de verdad (`LLM_PROVIDERS=gemini python -m soc.llm`).
+- **Reservar cuota de Claude para el domingo.**
+
 ## Gestión de cuota (importante)
 - **Nunca** lanzar el LLM sobre las 11.061 alertas. El flujo es: prefiltro determinista → LLM solo para lo ambiguo o relevante.
 - Guardar en caché las respuestas en `output/llm_cache/` por hash de (prompt + modelo), para no repetir llamadas al reejecutar.

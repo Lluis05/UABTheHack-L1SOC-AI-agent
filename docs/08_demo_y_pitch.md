@@ -6,8 +6,17 @@
 3. **En qué se basa para decidir**: evidencias con `event_id`, reglas de política aplicadas y matriz de severidad.
 4. **Qué propone**: veredicto, severidad, acciones.
 5. **Dónde interviene la persona**: aprobación de la contención y revisión de lo escalado.
-6. **Las 10 alertas comunes en directo.** El sistema tiene que procesarlas en vivo y deprisa:
-   `python -m soc.pipeline --ids ...`, o subir el fichero desde el dashboard.
+6. **Las 10 alertas comunes en directo, elegidas al azar.** Se tría en el momento, nada precalculado.
+   Se pegan o suben en el dashboard (o se lanza `--ids`/`--file`) y se ve cómo avanza cada una en tiempo real.
+   **Ensayadlo con `--random 10` varias veces**: así nos aseguramos de que no hay ninguna regla o tipo de alerta
+   que rompa el sistema. Hay 41 reglas distintas en el dataset y las raras (una sola alerta) también pueden salir.
+
+### Checklist antes de la defensa
+- [ ] DataStore precargado: el dashboard abierto y caliente **antes** de empezar.
+- [ ] API simulada levantada (`uvicorn ... --port 8000`).
+- [ ] `claude` logueado y con cuota disponible. Gemini probado.
+- [ ] Simulacro `--random 10 --live` hecho en el mismo portátil y la misma red, en menos de 2 minutos.
+- [ ] Vídeo de respaldo grabado por si falla la red.
 7. Hasta qué nivel hemos llegado y cómo lo hemos construido.
 8. **Una página para el comité de dirección de Tarvia.**
 

@@ -46,6 +46,15 @@ Es la base de todo y lo que más bloquea a los demás, así que va primero.
 **Regla de oro:** a las 15:30 y a las 19:00 tiene que haber algo funcionando de punta a punta, aunque sea feo.
 Un nivel 1 sólido gana a un nivel 4 roto.
 
+**Prueba de aceptación en cada integración:** `python -m soc.pipeline --random 10 --live`, que simula la defensa
+(10 alertas al azar triadas en directo). Hay que anotar el tiempo total y los errores. Objetivo: menos de 2 minutos
+y ninguna alerta sin ticket. Ver "Modo defensa en directo" en [04](04_arquitectura.md).
+
+**Responsabilidades del modo en vivo:**
+- A: DataStore caliente (< 1 s de contexto por alerta) y entrada por `--ids`, `--file` y `--random`.
+- B: llamadas LLM en paralelo, caché, cadena de fallback que no se cuelga y el prefiltro como hint en vivo.
+- C: en el dashboard, **pegar o subir alertas nuevas** y ver el progreso y la traza en tiempo real.
+
 ## Prioridades si vamos justos (recortar desde abajo)
 1. ✅ Nivel 1 sobre la muestra, con ticket correcto y argumentado.
 2. ✅ Dashboard con cola, traza y decisión humana.
