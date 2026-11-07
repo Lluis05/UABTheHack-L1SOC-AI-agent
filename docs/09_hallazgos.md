@@ -8,6 +8,11 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
   Ejemplo: SCCM "08:00-10:00" y la alerta ALR-20261005-000301 a las 07:56Z, que son las 09:56 en Barcelona (dentro de la ventana).
   España pasa de UTC+2 a UTC+1 el 25/10/2026. **Hay que confirmarlo** antes de basar decisiones en ventanas horarias.
 
+## Simulacros de la defensa (`python -m soc.pipeline --random 10 --live`)
+| Hora | Quién | Seed | Tiempo total | Resultado | Notas |
+|---|---|---|---|---|---|
+| 14:30 | Lluis | 7 | **79 s** (sonnet, 5 workers) | 10/10 tickets con IA, 0 fallos | 6 FP, 3 TP (WAF bloqueado), 1 needs_more_info (beacon a heartbeat.bmc-agent.example) |
+
 ## Datos (DataStore, Lluis 13:00)
 - Las **150 alertas de la muestra están incluidas** en `alertas.jsonl`. No hay alert_id duplicados.
 - Los **15.683 `related_events`** de todas las alertas existen en los logs: no hay referencias rotas.

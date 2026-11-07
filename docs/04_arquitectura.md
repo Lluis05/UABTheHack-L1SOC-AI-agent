@@ -276,6 +276,18 @@ No vale tener nada precalculado: el triaje con IA se hace en el momento. Consecu
 **Simulacro:** `python -m soc.pipeline --random 10 --live` coge 10 alertas al azar de todo el dataset y las tría en
 paralelo midiendo el tiempo. Hay que ejecutarlo en cada punto de integración: es nuestra prueba de aceptación.
 
+## Pipeline ✅ IMPLEMENTADO (`soc/pipeline.py`, `soc/triage/prefilter.py`)
+```python
+from soc.pipeline import run, load_alert_file
+tickets = run(alerts, mode="live", workers=5, on_step=lambda alert_id, step, info: ...)
+# mode: "live" (IA en todas, la política como pista) | "normal" (IA solo si la política no decide) | "no_llm"
+# pasos de on_step: contexto → politica → prefiltro → ia → revisor → ticket   (o "error")
+```
+- Escribe `output/tickets.jsonl` y `output/traces/<alert_id>.json` (traza + contexto completo, para el dashboard).
+- `x_mode` en cada ticket: `policy` (decidido por la política) | `llm` | `no_ai_fallback` | `pending_ai`.
+- Deduplicación (solo fuera de `live`): misma regla y mismas entidades en < 1 h → un ticket con varios `alert_ids`.
+- Sin IA, las alertas pendientes con severidad potencial high/critical se escalan a una persona (nunca quedan en silencio).
+
 ## Ejecución
 ```bash
 python -m soc.pipeline --sample                 # 150 alertas de desarrollo

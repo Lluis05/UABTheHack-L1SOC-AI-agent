@@ -86,7 +86,7 @@ Eres el camino crítico: B y C dependen de tu A3.
   con un caso positivo y uno negativo.
 - **Prompt:** *"Implementa A4 con tests. Ejecuta las reglas sobre la muestra y dame un recuento de hits por regla."*
 
-### A5 · Prefiltro y pipeline (17:30 → 19:00) 🔗 **INTEGRACIÓN 2**
+### A5 · Prefiltro y pipeline (17:30 → 19:00) 🔗 **INTEGRACIÓN 2** ✅ HECHO (14:30)
 - **Archivos:** `soc/triage/prefilter.py`, `soc/pipeline.py`.
 - **Qué:**
   - `prefilter(context) -> dict | None`: decisión determinista cuando es inequívoca (p. ej., `PENTEST_WINDOW` +
