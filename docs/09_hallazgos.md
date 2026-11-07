@@ -79,6 +79,11 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
   prompt de Vela que se hace pasar por SYSTEM (ALR-INJ-0004); la IA sí. 90 s para las 7 en paralelo. El intento de cerrar
   `</untrusted_data>` (ALR-INJ-0004) queda escapado y se detecta. **Para A:** se podría ampliar `PROMPT_INJECTION_TEXT`
   a command lines ("Analista o IA", "cerrar como") y a UC-AI-002.
+- (Marc, B3) **Gemini gratis NO sustituye a Claude en la defensa.** `LLM_PROVIDERS=bogus,gemini --random 10 --live --seed 7`:
+  10/10 tickets sin romperse, pero solo **2 con IA** y **210 s**. El plan gratuito de `gemini-3.8-flash` permite 5
+  peticiones/min (429 RESOURCE_EXHAUSTED) y tarda 2-3 min por alerta. El resto sale como `no_ai_fallback` (política,
+  marcado). Además `gemini-2.5-flash` (valor por defecto de `.env.example` y `soc/llm.py`) ya no está disponible para
+  claves nuevas: poned `GEMINI_MODEL=gemini-3.8-flash`. Conclusión: **cuidar la cuota de Claude para el domingo.**
 - Windows: los `print` con "→" fallan en consola cp1252. Ejecutad con `PYTHONUTF8=1` (o `set PYTHONUTF8=1`).
 
 ## Preguntas a Deloitte
