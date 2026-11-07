@@ -28,3 +28,9 @@ export function orDash(value) {
 export function countLabel(n, singular, plural = `${singular}s`) {
   return `${n} ${n === 1 ? singular : plural}`
 }
+
+const MAX_INITIALS = 2
+// "Ana García López" → "AG". Vacío si no hay nombre (el avatar muestra «?»).
+export function initials(name = '') {
+  return name.trim().split(/\s+/).filter(Boolean).slice(0, MAX_INITIALS).map((w) => w[0].toUpperCase()).join('')
+}

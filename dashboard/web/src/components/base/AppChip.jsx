@@ -9,6 +9,7 @@ const VARIANTS = {
   code: { variant: 'outlined', translate: 'no', sx: (t) => ({ ...t.typography.mono, fontWeight: 500 }) },
 }
 
-export default function AppChip({ label, tone = 'default', variant = 'outline', title }) {
-  return <Chip label={label} title={title} color={tone} {...VARIANTS[variant]} />
+// onDelete: muestra la × para quitarlo (filtros activos)
+export default function AppChip({ label, tone = 'default', variant = 'outline', title, onDelete }) {
+  return <Chip label={label} title={title} color={tone} onDelete={onDelete} {...VARIANTS[variant]} />
 }

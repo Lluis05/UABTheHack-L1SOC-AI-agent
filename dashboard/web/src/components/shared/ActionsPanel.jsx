@@ -24,7 +24,7 @@ export default function ActionsPanel({ ticket, config, onRequest }) {
   const actions = ticket.recommended_actions || []
   const executed = ticket.executed_actions || []
   return (
-    <AppCard title="Acciones recomendadas" action={<AppChip {...chipProps('decider', ticket.x_decided_by?.actions)} />}>
+    <AppCard title="Acciones" action={<AppChip {...chipProps('decider', ticket.x_decided_by?.actions)} />}>
       <AppStack gap={1}>
         {actions.length === 0 ? <AppText tone="muted">No se propone ninguna acción.</AppText> : null}
         {actions.map((a) => (
@@ -47,14 +47,13 @@ function ActionRow({ action: a, kind, done, onRequest }) {
   return (
     <AppStack gap={0.5}>
       <AppStack direction="row" gap={1} wrap>
-        <AppChip label={a.action} variant="code" />
+        <AppChip label={a.action} variant="code" title={a.justification} />
         <AppChip label={a.target} variant="code" />
         <AppChip {...KIND[kind].chip} title={a.x_approval?.note} />
         {approvers ? (
           <AppChip label={`${kind === ACTION_KIND.BLOCKED ? 'Escalar a' : 'Aprueba'}: ${approvers}`} tone="policy"
                    title="Lo decide la política, no la IA" />
         ) : null}
-        <AppText variant="caption" tone="muted">{a.justification}</AppText>
         <AppStack direction="row" grow justify="flex-end">
           {done ? <AppText variant="strong" tone="success">Ejecutada</AppText> : null}
           {!done && KIND[kind].button ? (
@@ -63,7 +62,7 @@ function ActionRow({ action: a, kind, done, onRequest }) {
             </AppButton>
           ) : null}
           {!done && kind === ACTION_KIND.DECISION ? (
-            <AppText variant="caption" tone="muted">Se decide en «Decisión humana»</AppText>
+            <AppText variant="caption" tone="muted">En «Decisión humana»</AppText>
           ) : null}
         </AppStack>
       </AppStack>

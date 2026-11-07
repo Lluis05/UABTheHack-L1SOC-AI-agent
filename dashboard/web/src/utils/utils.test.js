@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { ACTION_KIND, INPUT_MODE } from '../config/constants.js'
-import { actionKind, affectedGroups, approversLabel, EMPTY_FILTERS, findExecution, queueTickets } from './tickets.js'
+import {
+  actionKind, activeFilterCount, affectedGroups, affectedValues, approversLabel, EMPTY_FILTERS, findExecution, queueTickets,
+  splitVisible,
+} from './tickets.js'
 import { alertElapsedSeconds, buildTriageRequest, parseAlerts, parseIds, stepStates, summarizeJob } from './triage.js'
-import { countLabel, formatDateTime, formatPercent, toPercent } from './format.js'
+import { countLabel, formatDateTime, formatPercent, initials, toPercent } from './format.js'
 import { chipProps, optionsFor } from './chips.js'
 import { buildSearch, readUrlState } from './url.js'
 
@@ -121,5 +124,24 @@ describe('formato', () => {
     expect(toPercent(0.856)).toBe(86)
     expect(countLabel(1, 'alerta')).toBe('1 alerta')
     expect(countLabel(3, 'alerta')).toBe('3 alertas')
+  })
+})
+
+describe('rediseño: filtros, tags y avatar', () => {
+  it('cuenta solo los filtros con valor', () => {
+    expect(activeFilterCount(EMPTY_FILTERS)).toBe(0)
+    expect(activeFilterCount({ ...EMPTY_FILTERS, text: '  ', severity: 'high', decider: 'llm' })).toBe(2)
+  })
+  it('aplana las entidades afectadas sin repetir', () => {
+    expect(affectedValues({ users: ['u1'], hosts: ['H1', 'u1'], customers: [] })).toEqual(['u1', 'H1'])
+    expect(affectedValues(undefined)).toEqual([])
+  })
+  it('corta la fila de tags y dice cuántos quedan', () => {
+    expect(splitVisible(['a', 'b', 'c'], 2)).toEqual({ visible: ['a', 'b'], hidden: 1 })
+    expect(splitVisible(['a'], 4)).toEqual({ visible: ['a'], hidden: 0 })
+  })
+  it('saca las iniciales del nombre', () => {
+    expect(initials('  ana  garcía lópez ')).toBe('AG')
+    expect(initials('')).toBe('')
   })
 })

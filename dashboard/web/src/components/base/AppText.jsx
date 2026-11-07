@@ -2,6 +2,7 @@ import Typography from '@mui/material/Typography'
 
 // variant (explícita, sin booleanos): title | heading | body | strong | caption | mono | metric
 // tone: muted | error | success | primary | warning. as: elemento HTML (p. ej. "span" para texto en línea).
+// lines: recorta a N líneas con puntos suspensivos (resúmenes en tarjetas).
 const VARIANTS = {
   title: 'h1', heading: 'h2', body: 'body2', strong: 'strong', caption: 'caption', mono: 'mono', metric: 'metric',
 }
@@ -11,13 +12,15 @@ const TONES = {
 // Los identificadores no se traducen (web-design-guidelines: translate="no" en tokens de código)
 const NO_TRANSLATE = new Set(['mono'])
 
-export default function AppText({ variant = 'body', tone, as, children, ...rest }) {
+export default function AppText({ variant = 'body', tone, as, lines, children, ...rest }) {
+  const clamp = lines ? { display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined
   return (
     <Typography
       variant={VARIANTS[variant]}
       color={TONES[tone]}
       component={as}
       translate={NO_TRANSLATE.has(variant) ? 'no' : undefined}
+      sx={clamp}
       {...rest}
     >
       {children}

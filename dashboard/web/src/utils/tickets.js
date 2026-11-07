@@ -7,6 +7,11 @@ const UNKNOWN_RANK = Number.MAX_SAFE_INTEGER
 
 export const EMPTY_FILTERS = { text: '', severity: '', verdict: '', status: '', decider: '' }
 
+// Cuántos filtros hay activos (el número del botón «Filtros»)
+export function activeFilterCount(filters) {
+  return Object.values(filters).filter((v) => String(v).trim()).length
+}
+
 export function matchesFilters(ticket, filters) {
   const needle = filters.text.trim().toLowerCase()
   return (!filters.severity || ticket.severity === filters.severity)
@@ -53,4 +58,14 @@ export function affectedGroups(affected = {}) {
     ['Usuarios', affected.users], ['Hosts', affected.hosts],
     ['Servicios', affected.business_services], ['Clientes', affected.customers],
   ].filter(([, values]) => values?.length)
+}
+
+// Todas las entidades afectadas en una sola lista, sin repetir (tags en horizontal de la ficha)
+export function affectedValues(affected = {}) {
+  return [...new Set(affectedGroups(affected).flatMap(([, values]) => values))]
+}
+
+// Primeros max elementos y cuántos quedan fuera («+3»), para no partir la fila de tags
+export function splitVisible(items = [], max) {
+  return { visible: items.slice(0, max), hidden: Math.max(0, items.length - max) }
 }

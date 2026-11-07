@@ -62,7 +62,12 @@ export const theme = createTheme({
     metric: { fontSize: 22, fontWeight: 700, lineHeight: 1.2, ...TABULAR },
     caption: { ...TABULAR },
   },
-  layout: { queueWidth: 420, queueMaxHeight: 'calc(100vh - 260px)', logMaxHeight: 260, queueItemHeight: 96 },
+  layout: {
+    queueWidth: 420, queueMaxHeight: 'calc(100vh - 230px)', logMaxHeight: 260,
+    ticketCardMinWidth: 320, ticketCardHeight: 168,
+    // Modal de información extendida: alto fijo proporcional a la pantalla
+    dialogLgHeight: '80vh',
+  },
   components: {
     MuiCssBaseline: {
       styleOverrides: {
@@ -81,5 +86,7 @@ export const theme = createTheme({
     MuiCard: { defaultProps: { variant: 'outlined' } },
     MuiTableCell: { styleOverrides: { root: { verticalAlign: 'top', wordBreak: 'break-word', ...TABULAR } } },
     MuiTab: { styleOverrides: { root: { textTransform: 'none', minHeight: 40, fontWeight: 600 } } },
+    // Deshabilitado: legible pero claramente inactivo (botones, tabs, tarjetas)
+    MuiButtonBase: { styleOverrides: { root: { '&.Mui-disabled': { opacity: 0.45 } } } },
   },
 })

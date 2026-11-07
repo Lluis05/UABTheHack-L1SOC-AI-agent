@@ -2,11 +2,13 @@ import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 
 // options: [{value, label}]. emptyLabel: texto de la opción "sin filtro" (valor ''). label siempre visible.
-export default function AppSelect({ value, onChange, options, label, emptyLabel }) {
+// width: ancho fijo; sin él ocupa todo el ancho.
+export default function AppSelect({ value, onChange, options, label, emptyLabel, width }) {
   return (
     <TextField
       select
-      fullWidth
+      fullWidth={!width}
+      sx={width ? { width } : undefined}
       value={value}
       label={label}
       onChange={(e) => onChange(e.target.value)}

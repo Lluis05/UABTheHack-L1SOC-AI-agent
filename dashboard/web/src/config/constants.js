@@ -86,11 +86,27 @@ export const CHIP_HINTS = {
 export const STEP_LABELS = { context: 'Contexto', policy: 'Política', llm: 'IA', reviewer: 'Revisor', ticket: 'Ticket' }
 
 export const PAGES = [
-  { value: PAGE.QUEUE, label: 'Cola' },
-  { value: PAGE.LIVE, label: 'Triaje en directo' },
+  { value: PAGE.QUEUE, label: 'Tickets' },
+  { value: PAGE.LIVE, label: 'Upload' },
   { value: PAGE.INCIDENTS, label: 'Incidentes' },
-  { value: PAGE.CONTAINMENT, label: 'Contención' },
+  { value: PAGE.CONTAINMENT, label: 'Acciones' },
 ]
+
+export const APP_TITLE = 'Dashboard de incidencias'
+
+// Información extendida del ticket (modal con pestañas): lo que no cabe en la ficha sin hacer scroll
+export const DETAIL_TAB = { SUMMARY: 'summary', EVIDENCE: 'evidence', TRACE: 'trace', HISTORY: 'history' }
+export const DETAIL_TABS = [
+  { value: DETAIL_TAB.SUMMARY, label: 'Resumen' },
+  { value: DETAIL_TAB.EVIDENCE, label: 'Evidencias' },
+  { value: DETAIL_TAB.TRACE, label: 'Consultas' },
+  { value: DETAIL_TAB.HISTORY, label: 'Historial' },
+]
+
+// Tags visibles por fila de la ficha antes de resumir en «+N»
+export const MAX_ROW_TAGS = 4
+// Líneas de resumen en cada tarjeta de la cola
+export const CARD_SUMMARY_LINES = 2
 
 export const INPUT_MODES = [
   { value: INPUT_MODE.PASTE, label: 'Pegar JSON' },
