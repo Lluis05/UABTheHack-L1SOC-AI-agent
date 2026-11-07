@@ -1,0 +1,46 @@
+{
+ "trace": [
+  {
+   "step": "alert_load",
+   "query": "ALR-EJ-0001",
+   "result": "found",
+   "ms": 1
+  },
+  {
+   "step": "asset_lookup",
+   "query": "WS-BCN-1174",
+   "result": "found (Media)",
+   "ms": 3
+  },
+  {
+   "step": "user_lookup",
+   "query": "svc_sccm",
+   "result": "service account",
+   "ms": 2
+  },
+  {
+   "step": "related_events",
+   "query": "EDR-EJ-0005329",
+   "result": "1 evento",
+   "ms": 2
+  },
+  {
+   "step": "change_calendar",
+   "query": "WS-BCN-1174 08:42",
+   "result": "CHG-2026-1031",
+   "ms": 1
+  },
+  {
+   "step": "policy_rules",
+   "query": "SCCM_INVENTORY",
+   "result": "benign",
+   "ms": 0
+  },
+  {
+   "step": "severity_matrix",
+   "query": "medium × Media",
+   "result": "informational",
+   "ms": 0
+  }
+ ]
+}

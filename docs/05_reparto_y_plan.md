@@ -28,7 +28,7 @@ Es la base de todo y lo que más bloquea a los demás, así que va primero.
 - "Lo que no resolvemos" con datos reales.
 
 ### Persona C: Dashboard, contención y presentación (Adrián)
-- `dashboard/app.py` (Streamlit): cola de alertas con filtros, detalle del ticket, **traza de consultas**, evidencias,
+- `dashboard/web/` (React + Vite) y `dashboard/server.py` (FastAPI): cola de alertas con filtros, detalle del ticket, **traza de consultas**, evidencias,
   quién decidió cada cosa, vista de incidentes y botón **"Aprobar acción"** que llama a `POST /approvals` y luego a `POST /containment/{accion}`.
 - `dashboard/containment.py`: cliente de la API simulada.
 - Métricas: % de alertas cerradas automáticamente, % que pasan por el LLM, % escaladas y tiempo ahorrado.
@@ -38,7 +38,7 @@ Es la base de todo y lo que más bloquea a los demás, así que va primero.
 ## Plan horario
 | Hora | A (datos/política) | B (agente IA) | D (hunting/correlación) | C (dashboard/pitch) |
 |---|---|---|---|---|
-| 12:30-13:30 | Setup, lectura de docs, DataStore | Setup, leer runbooks, prompt v0 | Setup, threat hunting | Setup, esqueleto de Streamlit con tickets de ejemplo |
+| 12:30-13:30 | Setup, lectura de docs, DataStore | Setup, leer runbooks, prompt v0 | Setup, threat hunting | Setup, esqueleto del dashboard React con tickets de ejemplo |
 | 13:30-15:30 | Índices + `build_context` | `agent.py` con un contexto hecho a mano | Threat hunting → `incidents_truth.jsonl` (15:00) | Vista de cola y detalle + traza |
 | **15:30** | **🔗 Integración 1:** contexto real → agente → ticket → dashboard (5 alertas) | | | |
 | 15:30-19:00 | `severity` + `rules` + prefiltro | Revisor, paralelismo, robustez | Etiquetas de evaluación, inicio de la correlación | Aprobación y contención en la API, métricas |

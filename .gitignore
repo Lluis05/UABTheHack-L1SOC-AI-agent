@@ -9,3 +9,5 @@ output/
 *.duckdb
 *.db
 data/cache/
+node_modules/
+dashboard/web/dist/

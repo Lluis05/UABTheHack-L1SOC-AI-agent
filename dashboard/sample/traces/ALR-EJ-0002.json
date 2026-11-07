@@ -1,0 +1,34 @@
+{
+ "trace": [
+  {
+   "step": "alert_load",
+   "query": "ALR-EJ-0002",
+   "result": "found",
+   "ms": 1
+  },
+  {
+   "step": "asset_lookup",
+   "query": "WEB-FRONT-01",
+   "result": "found (Alta)",
+   "ms": 2
+  },
+  {
+   "step": "intel",
+   "query": "192.0.2.11",
+   "result": "sin reputación",
+   "ms": 4
+  },
+  {
+   "step": "change_calendar",
+   "query": "192.0.2.11",
+   "result": "CHG-2026-1042",
+   "ms": 1
+  },
+  {
+   "step": "other_alerts",
+   "query": "192.0.2.11",
+   "result": "1 alerta (ALR-EJ-0003)",
+   "ms": 5
+  }
+ ]
+}

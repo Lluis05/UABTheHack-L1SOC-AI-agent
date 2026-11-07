@@ -66,8 +66,13 @@ soc/
     investigate.py       # informe nivel 3 (Persona D)
   pipeline.py            # orquesta 1→6, CLI (Persona A)
 dashboard/
-  app.py                 # Streamlit (Persona C)
+  server.py              # backend FastAPI del dashboard: solo rutas (Persona C)
+  settings.py            # constantes y rutas del dashboard
+  results.py             # lectura de output/ + decisiones humanas + métricas (con tests)
+  live.py                # triaje en directo: motores inprocess/subprocess/simulado (con tests)
   containment.py         # cliente de la API simulada (Persona C)
+  sample/                # tickets/incidentes/trazas de EJEMPLO con este contrato (se usan si no hay output/)
+  web/                   # frontend React + Material UI + Vite (Persona C); base → shared → pages
 eval/
   labels_dev.jsonl       # etiquetas manuales de la muestra (Persona D)
   incidents_truth.jsonl  # incidentes encontrados con threat hunting (Persona D)
@@ -241,8 +246,8 @@ No vale tener nada precalculado: el triaje con IA se hace en el momento. Consecu
    - un fichero JSONL con alertas completas (`--file defensa.jsonl`),
    - subir o pegar JSON en el dashboard.
    Si una alerta nueva hace referencia a eventos que no tenemos, el sistema lo dice (`open_questions`) y no se rompe.
-3. **DataStore cargado una sola vez y en memoria ("caliente").** El dashboard lo carga al arrancar
-   (`st.cache_resource`) y lo reutiliza. Triar una alerta no puede implicar volver a leer 800.000 eventos.
+3. **DataStore cargado una sola vez y en memoria ("caliente").** El backend del dashboard
+   (`dashboard/server.py`, un proceso de larga duración) lo carga una vez y lo reutiliza. Triar una alerta no puede implicar volver a leer 800.000 eventos.
    - Objetivo: contexto determinista **< 1 s por alerta**. LLM unos 10-30 s.
 4. **Las 10 alertas se procesan en paralelo** (pool de 4-5 llamadas LLM simultáneas). Objetivo: **las 10 en menos de 2 minutos**.
 5. **En modo en vivo siempre se ejecuta el LLM**, también cuando el prefiltro ya tiene una decisión. El prefiltro
@@ -266,5 +271,32 @@ python -m soc.pipeline --ids ALR-...,ALR-... --live   # alertas concretas (¡las
 python -m soc.pipeline --file defensa.jsonl --live    # alertas nuevas desde fichero
 python -m soc.pipeline --random 10 --live             # SIMULACRO de la defensa (cronometrado)
 python -m soc.pipeline --all --no-llm                 # todo el dataset solo con la parte determinista (métricas)
-streamlit run dashboard/app.py
+
+# Dashboard (React + FastAPI). Una vez: cd dashboard/web && npm install && npm run build
+uvicorn dashboard.server:app --port 8001              # http://localhost:8001
+# Desarrollo del frontend con recarga: (cd dashboard/web && npm run dev) → http://localhost:5173
+# Sin pipeline todavía: DASHBOARD_SIMULATE=1 → triaje en vivo FALSO, marcado [SIMULADO], solo para probar la UI
 ```
+
+### Dashboard ↔ pipeline (Persona C ↔ Persona A) — PROPUESTA, pendiente de confirmar con A
+El dashboard lee **solo de disco** (`output/tickets.jsonl`, `output/traces/*.json`, `output/incidents.jsonl` y,
+si existe, `output/metrics.json` con las métricas del batch). Si `output/tickets.jsonl` no existe, sirve
+`dashboard/sample/` y lo indica en la cabecera ("datos de EJEMPLO").
+
+Las decisiones humanas se guardan en `output/human_decisions.jsonl` (el dashboard **no** reescribe `tickets.jsonl`):
+```json
+{"ticket_id":"TKT-...","type":"containment|close|escalate|reopen","approver":"Adrián","timestamp":"...",
+ "action":"revoke_sessions","target":"...","approval_token":"APR-...","ok":true,"verdict":null,"comment":"..."}
+```
+
+Para el triaje en directo, el backend usa, por orden:
+1. **En proceso (preferido, DataStore caliente):** si `soc.pipeline` expone
+   ```python
+   def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, random: int = 0,
+                   on_step: Callable[[str, str, dict], None] | None = None) -> list[dict]   # -> Tickets
+   ```
+   `on_step(alert_id, step, data)` con `step` en `context|policy|llm|reviewer|ticket|error` y `data` =
+   `{"trace_entry"?: {...}, "ticket"?: Ticket, "error"?: str, "message"?: str}`. Cada entrada de `trace` se emite al
+   producirse (para verla en vivo) y al final `on_step(alert_id, "ticket", {"ticket": {...}})`. Las 10 en paralelo las gestiona el pipeline.
+2. **Subproceso (fallback):** `python -m soc.pipeline --live --file/--ids/--random` y lee los tickets nuevos de
+   `output/tickets.jsonl` al acabar (sin progreso paso a paso).

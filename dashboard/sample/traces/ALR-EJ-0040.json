@@ -1,0 +1,28 @@
+{
+ "trace": [
+  {
+   "step": "alert_load",
+   "query": "ALR-EJ-0040",
+   "result": "found",
+   "ms": 1
+  },
+  {
+   "step": "user_lookup",
+   "query": "adm.jlopez",
+   "result": "privileged",
+   "ms": 2
+  },
+  {
+   "step": "logs_search",
+   "query": "adm.jlopez ±24h",
+   "result": "auth 6",
+   "ms": 90
+  },
+  {
+   "step": "llm_triage",
+   "query": "claude_code",
+   "result": "needs_more_info",
+   "ms": 15100
+  }
+ ]
+}

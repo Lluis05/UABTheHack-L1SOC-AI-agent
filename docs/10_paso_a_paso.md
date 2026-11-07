@@ -213,12 +213,12 @@ y construir la correlación que los encuentre automáticamente (niveles 2 y 3).
 **Misión:** que el jurado *vea* cómo la IA hace el triaje y dónde decide la persona. Esto es lo que van a evaluar visualmente.
 
 ### C1 · Esqueleto con datos falsos (12:45 → 14:00)
-- **Archivos:** `dashboard/app.py`, `dashboard/sample_tickets.jsonl` (datos falsos según el contrato de `docs/04`).
-- **Qué:** añadir `streamlit` a `requirements.txt`. Páginas: **Cola**, **Detalle de alerta/ticket**, **Incidentes**,
+- **Archivos:** `dashboard/web/` (React + Material UI), `dashboard/server.py` (FastAPI) y `dashboard/sample/` (datos falsos según el contrato de `docs/04`). ✅ hecho.
+- **Qué:** React + Material UI con la jerarquía base → shared → pages (ver `docs/06`). Páginas: **Cola**, **Detalle de alerta/ticket**, **Incidentes**,
   **Métricas**, **Defensa en directo**.
   - Cola: tabla con severidad (color), veredicto, título, regla, `x_decided_by`, estado y filtros.
-- **Terminado cuando:** `streamlit run dashboard/app.py` muestra la cola con 5-10 tickets falsos.
-- **Prompt:** *"Implementa C1 con Streamlit. Crea 8 tickets falsos realistas usando el contrato Ticket de docs/04."*
+- **Terminado cuando:** `uvicorn dashboard.server:app --port 8001` muestra la cola con los tickets de ejemplo en http://localhost:8001.
+- **Nada de Streamlit:** el dashboard es React + Material UI.
 
 ### C2 · Detalle y traza (14:00 → 15:30) 🔗 **INTEGRACIÓN 1**
 - **Qué:** vista de detalle con:
@@ -245,11 +245,11 @@ y construir la correlación que los encuentre automáticamente (niveles 2 y 3).
 ### C4 · Defensa en directo (18:00 → 20:00) ⭐ **la página más importante**
 - **Qué:** página "Defensa en directo":
   - Entrada: pegar IDs, **pegar JSON de alertas** o subir JSONL.
-  - Botón "Triar". Llama al pipeline de A/B **dentro del proceso**, con el DataStore precargado mediante `st.cache_resource`.
-  - Progreso **en tiempo real** por alerta (contexto → política → IA → revisor → ticket) con `st.status` o similar,
+  - Botón "Triar". Llama al pipeline de A/B **dentro del proceso** del backend (`dashboard/live.py`), con el DataStore precargado.
+  - Progreso **en tiempo real** por alerta (contexto → política → IA → revisor → ticket) en la página "Triaje en directo",
     y la traza apareciendo mientras se calcula.
   - Al terminar: resumen (veredictos, severidades, escalados, tiempo total frente a los ~15 min por alerta de un humano).
-- Coordinar con A y B: necesitas una función de pipeline con **callback de progreso** (`on_step(alert_id, step, data)`).
+- Coordinar con A y B: necesitas una función de pipeline con **callback de progreso** (`on_step(alert_id, step, data)`); el contrato está en `docs/04` → "Dashboard ↔ pipeline".
 
 ### C5 · Incidentes y métricas (20:00 → 00:00)
 - [ ] Página Incidentes: lista y, en el detalle, una **línea de tiempo de la cadena de ataque** (alertas por táctica MITRE a lo largo de los días) con las entidades implicadas.
