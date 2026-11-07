@@ -110,13 +110,13 @@ Eres el camino crítico: B y C dependen de tu A3.
 **Misión:** que la IA razone como un buen N1, cite evidencias reales y no se deje manipular.
 **Rama:** `feat/agent`. **Módulos:** `soc/triage/agent.py`, `soc/triage/reviewer.py`, `soc/triage/prompts/`, `eval/evaluate.py`.
 
-### B1 · Conocer el terreno (12:45 → 13:30)
-- [ ] Leer los 10 runbooks (`DATASET_DIR/01_contexto/runbooks/`), el catálogo de casos de uso y `docs/07_llm.md`.
-- [ ] Elegir **8 alertas de desarrollo** de la muestra que cubran: WEB-001, EML-001, EDR-002 (SCCM y otra), IDP-001,
+### B1 · Conocer el terreno (12:45 → 13:30) ✅ HECHO (13:25)
+- [x] Leer los 10 runbooks (`DATASET_DIR/01_contexto/runbooks/`), el catálogo de casos de uso y `docs/07_llm.md`.
+- [x] Elegir **8 alertas de desarrollo** de la muestra que cubran: WEB-001, EML-001, EDR-002 (SCCM y otra), IDP-001,
   NET-001, AI-001 y una high. Guardar sus IDs en `eval/dev_set.txt`.
 - **Prompt:** *"Lee los runbooks y la muestra. Propón 8 alertas de desarrollo variadas y explica por qué cada una."*
 
-### B2 · Agente de triaje v1 (13:30 → 15:30) 🔗 **INTEGRACIÓN 1**
+### B2 · Agente de triaje v1 (13:30 → 15:30) 🔗 **INTEGRACIÓN 1** ✅ v1 HECHO (13:30)
 - **Archivos:** `soc/triage/agent.py`, `soc/triage/prompts/system.md` (los runbooks se leen del dataset).
 - **Qué:**
   - `triage(context, prefilter_hint=None) -> dict` usando `soc.llm.complete()` con JSON Schema (subset del Ticket

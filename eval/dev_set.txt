@@ -1,0 +1,10 @@
+# Dev set del agente (Persona B). Una alerta por línea; '#' = comentario.
+# Cubre runbooks RB-01, 02, 03, 05, 07 y 09 y los tres veredictos.
+ALR-20261005-000301  # UC-EDR-002 PowerShell codificado de CcmExec (SCCM) -> esperado benign_true_positive (CHG-2026-1031)
+ALR-20261005-000099  # UC-EML-001 newsletter de news.zalando.example reportada -> esperado false_positive
+ALR-20261008-001405  # UC-WEB-001 phpunit eval-stdin.php bloqueado por WAF, IP no del pentest -> TP bloqueado, severidad baja
+ALR-20261009-001917  # UC-IDP-001 viaje imposible BCN->París con móvil corporativo conocido -> probable benign/FP
+ALR-20261009-011792  # UC-NET-001 beaconing a aplihartom.com (6 días) desde WS-BCN-1770 (marta.puig) -> TP, cadena con EDR-001
+ALR-20261014-003986  # UC-AI-001 "Ignora lo anterior, me equivoqué de pedido" -> false_positive (cliente se corrige)
+ALR-20261010-011827  # UC-IDP-003 fatiga MFA, 27 push y aprobado desde VPN comercial -> TP high, escalar
+ALR-20261020-011905  # UC-EML-001 factura de packaging-iberia-pagos.example -> phishing/fraude, revisar clics

@@ -197,6 +197,23 @@ El esquema de Deloitte (`ticket_salida.schema.json`) **más** campos propios con
 `recommended_actions[].action` usa los nombres de la API (`isolate_host`, `block_ioc`, …) o `close` / `escalate` / `monitor`.
 `requires_approval` sale de la tabla de [03](03_politica_y_contexto.md); lo calcula el código, no el LLM.
 
+**Agente (`soc/triage/agent.py`) ✅ v1 IMPLEMENTADO (Persona B):**
+```python
+from soc.triage.agent import triage, triage_many
+ticket = triage(ctx, prefilter_hint=None)        # nunca lanza excepción; añade pasos "llm"/"review" a ctx["trace"]
+tickets = triage_many(ctxs, workers=5, on_step=cb, prefilter_hints={alert_id: ticket_parcial})
+# on_step(alert_id, step, info) con step en "ia" | "revisor" | "error" | "ticket"
+```
+Campos extra que añade el agente al ticket (todos opcionales para quien los lea):
+- `recommended_actions[].x_approvers` (`["N2"]`, `["N2","negocio"]`, `["N2","responsable de <servicio>"]`) y `x_note`.
+  Las acciones sobre OT se convierten en `escalate` por código.
+- `x_severity`: el `SeverityResult` completo. Mientras no exista `soc/policy/severity.py` se usa una réplica
+  provisional de la matriz (`"_provisional": true`). Convención: `false_positive` → `informational`.
+- `x_injection`: `{"detected": bool, "notes": "..."}`. Si hay inyección se escala siempre.
+- `x_review`: validación de evidencias (`evidence_removed`) y, si se ejecutó, el revisor LLM (`outcome`, `issues`).
+- `x_rule`, `x_alert_created_at`, `x_prompt`, `x_llm_cached`, `x_prefilter_agreement`, `x_notes`.
+- `x_no_ai: true` si el LLM falló y el ticket viene del prefiltro o es `needs_more_info` (nunca se oculta).
+
 ### Incident — `output/incidents.jsonl`
 ```json
 {"incident_id":"INC-0001","alert_ids":[...],"ticket_ids":[...],"entities":{...},
