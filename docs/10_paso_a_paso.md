@@ -55,7 +55,7 @@ Eres el camino crítico: B y C dependen de tu A3.
 - **Terminado cuando:** `search()` responde en menos de 50 ms y `extract_entities` funciona sobre las 150 alertas de la muestra sin excepciones.
 - **Prompt:** *"Implementa A2. Prueba extract_entities sobre las 150 alertas de la muestra y reporta tipos de entidad que no se normalizan."*
 
-### A3 · build_context (15:00 → 15:30) 🔗 **ENTREGA CRÍTICA**
+### A3 · build_context (15:00 → 15:30) 🔗 **ENTREGA CRÍTICA** ✅ HECHO (13:20)
 - **Archivos:** `soc/enrich/context.py`.
 - **Qué:** `build_context(alert, store) -> Context` exactamente según `docs/04`: activos, usuarios (+RRHH),
   related_events, entity_activity ±24 h (como mucho 30 eventos por entidad y fuente), intel y GeoIP de cada IP, dominio y hash, sandbox,

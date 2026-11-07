@@ -97,27 +97,57 @@ class DataStore:
 ```
 Rendimiento: `search` y `alerts_for_entity` deben responder en < 200 ms (con índice invertido por entidad).
 
-### Context — salida de `build_context(alert, store)`
+### Context — salida de `build_context(alert, store)` ✅ IMPLEMENTADO (`soc/enrich/context.py`)
+```python
+from soc.data.store import get_store
+from soc.enrich.context import build_context
+ctx = build_context(alert_dict, get_store())     # 1-20 ms; funciona con alertas nuevas o mal formadas
+```
+Para tener contextos reales en disco: `python -m soc.enrich.context --sample` → `output/contexts_sample.jsonl`
+(o `--ids ALR-...,ALR-...`).
 ```json
 {
   "alert": { "...alerta original..." },
-  "entities": {"users": ["upn"], "hosts": ["WS-BCN-1174"], "ips": [], "domains": [], "urls": [],
-               "hashes": [], "customers": [], "emails": [], "processes": []},
-  "assets":  [{"hostname":"...","ip":"...","criticality":"Alta","zone":"...","business_service":"...",
-               "owner_upn":"...","internet_facing":false,"edr_installed":true,"vulnerabilities":[...]}],
-  "users":   [{"upn":"...","department":"...","title":"...","account_type":"user","privileged":false,
-               "vip":false,"status":"active","workstation":"...","hr_events":[...]}],
+  "entities": {"users": ["upn en minúsculas"], "hosts": ["ws-bcn-1174"], "ips": [], "domains": [], "urls": [],
+               "hashes": [], "emails": [], "customers": [], "cloud": [], "sessions": [], "message_ids": [],
+               "processes": []},
+  "entity_stats": {"<entidad>": {"events_total": 29, "alerts_total": 1, "hub": false,
+                                 "first_seen": "ISO", "last_seen": "ISO"}},
+  "assets":  [{"hostname":"WS-BCN-1174","ip":"...","type":"Portátil","criticality":"Baja|Media|Alta|Crítica",
+               "zone":"HQ-USERS","business_service":"...","owner_upn":"...","internet_facing":"False",
+               "edr_installed":"True","vulnerabilities":[...], "_via": "implícito (WAF)" /* solo si es implícito */}],
+  "business_services": [{"servicio":"Tienda online y app","criticidad":"Crítica","impacto":"...",
+                         "activos":"...","responsable":"Directora de E-commerce","_matched":["web-ecom01"]}],
+  "users":   [{"upn":"...","username":"...","display_name":"...","department":"...","title":"...",
+               "account_type":"user|service|admin|external","privileged":"True|False","vip":"True|False",
+               "mfa_method":"...","status":"...","workstation":"...","notes":"...","hr_events":[...],
+               "_via":"alert|asset_owner"}],
   "related_events": [{"_source":"edr_events","event_id":"EDR-0005329", "...": "..."}],
-  "entity_activity": {"WS-BCN-1174": {"edr_events": [...], "proxy": [...]}},
-  "intel":   [{"indicator":"1.2.3.4","type":"ip","tip":{...}|null,"geo":{...}|null}],
-  "sandbox": [{...}],
-  "other_alerts": [{"alert_id":"...","rule_id":"...","created_at":"...","shared_entity":"..."}],
-  "policy_hits": [ PolicyHit ],
-  "severity": SeverityResult,
-  "trace": [{"step":"asset_lookup","query":"WS-BCN-1174","result":"found","ms":3}]
+  "missing_related_events": ["ids que la alerta cita pero no existen (alertas nuevas)"],
+  "entity_activity": {"<entidad>": {"<fuente>": [eventos ±24h, máx 20 por fuente, sin repetir eventos]}},
+  "intel":   [{"indicator":"1.2.3.4","type":"ip|domain|sha256|url|email","tip":{...}|null,"geo":{...}|null}],
+  "sandbox": [{...informe...}],
+  "other_alerts": [{"alert_id":"...","rule_id":"...","rule_name":"...","severity":"...","created_at":"...",
+                    "shared_entities":["..."]}],          // ±7 días, máx 40, sin hubs
+  "other_alerts_total": 12,
+  "changes": [{"id":"CHG-2026-1031","titulo":"...","inicio":"local","fin":"local","inicio_utc":"ISO",
+               "fin_utc":"ISO","active_at_alert":true, "...": "..."}],   // cambios a ±1 día
+  "policy_hits": [ PolicyHit ],        // lo rellena A4 (vacío hasta entonces)
+  "severity": SeverityResult | null,   // lo rellena A4
+  "trace": [{"step":"cmdb","source":"CMDB","query":"WS-BCN-1174","result":"WS-BCN-1174 · criticidad Media · HQ-USERS","ms":0.02}],
+  "build_ms": 1.4
 }
 ```
-`trace` es lo que el dashboard muestra como "qué consultó la IA". **Cada lookup añade una entrada.**
+Notas:
+- **Ojo con los booleanos del CSV:** `privileged`, `vip`, `internet_facing` y `edr_installed` son strings `"True"`/`"False"`.
+- **Hubs:** las entidades con más de 10.000 eventos o más de 300 alertas (p. ej. `tarvia.example` o la IP de salida
+  corporativa 198.18.200.10) **no** vuelcan su actividad ni sus alertas relacionadas. Se marcan en `entity_stats[...].hub`.
+- **Rareza:** `entity_stats` permite argumentar cosas como "dominio visto por primera vez hoy, en 3 eventos de todo el mes".
+- **`trace[].source`** (CMDB, Directorio, Logs, TIP/GeoIP, Sandbox, SIEM, Cambios, Servicios, Política) sirve al
+  dashboard para poner iconos y agrupar.
+- **Activos implícitos:** las alertas de WAF y ECOM llevan WEB-ECOM01..04 (Crítica) y las de AI_GATEWAY llevan AI-ASSIST01.
+- **Hook de política:** `build_context` llama a `soc.policy.evaluate_policy(ctx, store) -> (policy_hits, severity)`
+  si existe (A4).
 
 ### PolicyHit — `soc/policy/rules.py`
 ```json
