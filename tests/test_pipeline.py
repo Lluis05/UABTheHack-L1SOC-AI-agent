@@ -44,7 +44,7 @@ def test_new_alerts_from_file(tmp_path):
     assert [a["alert_id"] for a in alerts] == ["ALR-NUEVA-0001", "ALR-NUEVA-0002"]
     steps = []
     tickets = run(alerts, mode="no_llm", save_traces=False, on_step=lambda a, s, i: steps.append(s))
-    assert len(tickets) == 2 and {"contexto", "politica", "prefiltro", "ticket"} <= set(steps)
+    assert len(tickets) == 2 and {"context", "policy", "ticket"} <= set(steps)
 
 
 def test_dedup_groups_same_rule_and_entities():
@@ -54,3 +54,19 @@ def test_dedup_groups_same_rule_and_entities():
     c = {**a, "alert_id": "DUP-2", "created_at": "2026-10-06T08:10:00.000Z"}
     groups = dedup_groups([build_context(x, s) for x in (a, b, c)])
     assert sorted(len(g) for g in groups) == [1, 2]
+
+
+def test_triage_live_contract_with_dashboard(monkeypatch, tmp_path):
+    """Contrato docs/04: triage_live emite trace_entry y un ticket por alerta (IA simulada: no gasta cuota)."""
+    import soc.pipeline as p
+    import soc.triage.agent as agent
+    from soc import config
+
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(agent, "cached_complete", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("sin IA")))
+    events = []
+    tickets = p.triage_live(ids=["ALR-20261005-000301"], on_step=lambda a, s, d: events.append((a, s, d)))
+    assert len(tickets) == 1 and tickets[0]["x_mode"] == "no_ai_fallback"
+    assert any(d.get("trace_entry") for _, _, d in events)
+    assert [s for _, s, d in events if d.get("ticket")] == ["ticket"]
+    assert (tmp_path / "tickets.jsonl").exists()

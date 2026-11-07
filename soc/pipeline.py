@@ -14,20 +14,26 @@ Modos:
     (normal)  la política cierra lo inequívoco; el LLM solo ve lo ambiguo.
     --no-llm  nada de LLM: lo no concluyente queda como "pendiente de IA".
 
-API para el dashboard (C4):
-    from soc.pipeline import run
-    tickets = run(alerts, mode="live", on_step=lambda alert_id, step, info: ...)
-    pasos: contexto → politica → prefiltro → ia → revisor → ticket   (o error)
+API para el dashboard (C4) — contrato "Dashboard ↔ pipeline" de docs/04:
+    from soc.pipeline import run, triage_live
+    tickets = triage_live(alerts=[...] | ids=[...] | random=10, on_step=cb)     # siempre modo live
+    tickets = run(alerts, mode="live|normal|no_llm", on_step=cb)
+    cb(alert_id, step, data): step ∈ context | policy | llm | reviewer | ticket | error
+                              data = {"trace_entry"?: {...}, "ticket"?: Ticket, "error"?: str, "message"?: str}
+    Cada entrada de la traza se emite al producirse y cada ticket en cuanto su alerta termina.
 """
 
 from __future__ import annotations
 
 import argparse
 import collections
+import concurrent.futures as cf
 import json
 import logging
+import os
 import random
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Callable, Iterable
@@ -130,14 +136,23 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
     assert mode in ("live", "normal", "no_llm"), mode
     store = store or get_store()
     alerts = list(alerts)
-    step = on_step or (lambda *_: None)
+    lock = threading.Lock()
+
+    def step(aid: str, s: str, data: dict | None = None) -> None:
+        if on_step:
+            with lock:
+                try:
+                    on_step(aid, s, data or {})
+                except Exception:  # noqa: BLE001 - un fallo del dashboard no tumba el triaje
+                    log.exception("on_step falló")
+
     dedup = (mode != "live") if dedup is None else dedup
 
     # 1-3 · contexto + política + prefiltro (determinista, ms)
     contexts, hints = [], {}
     for a in alerts:
         aid = a.get("alert_id", "?")
-        step(aid, "contexto", {})
+        step(aid, "context", {"message": "recopilando contexto (CMDB, directorio, logs ±24 h, TIP, cambios…)"})
         try:
             ctx = build_context(a, store)
         except Exception as e:  # noqa: BLE001 - nunca romper la cola por una alerta
@@ -145,49 +160,136 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
             ctx = {"alert": a, "entities": {}, "trace": [{"step": "error", "source": "Contexto", "query": aid,
                                                           "result": f"error construyendo contexto: {e}", "ms": 0}],
                    "policy_hits": [], "severity": None}
+        for e in ctx.get("trace") or []:
+            step(aid, "policy" if e.get("source") == "Política" else "context", {"trace_entry": e})
         sev = ctx.get("severity") or {}
-        step(aid, "politica", {"hits": len(ctx.get("policy_hits") or []), "severity": sev.get("final"),
-                               "suggestion": (sev.get("suggestion") or {}).get("verdict")})
+        sug = sev.get("suggestion") or {}
         hint = prefilter(ctx)
         hints[aid] = hint
-        step(aid, "prefiltro", {"verdict": (hint or {}).get("verdict"), "decisive": bool(hint and hint["decisive"])})
+        step(aid, "policy", {"message": f"política: {len(ctx.get('policy_hits') or [])} reglas · severidad "
+                                        f"{sev.get('final')} · sugiere {sug.get('verdict') or '—'}"
+                                        f"{' (concluyente)' if hint and hint.get('decisive') else ''}"})
         contexts.append(ctx)
 
     groups = dedup_groups(contexts) if dedup else [[c] for c in contexts]
+    out_by_rep: dict[str, dict] = {}
 
-    # 4 · decidir quién tría cada grupo
-    to_llm, tickets_by_rep = [], {}
+    def finish(group: list[dict], t: dict) -> None:
+        rep = group[0]
+        aid = (rep.get("alert") or {}).get("alert_id")
+        t = _merge_group(t, group)
+        if save_traces:
+            _save_trace(rep, t)
+        out_by_rep[aid] = t
+        for c in group:
+            step((c.get("alert") or {}).get("alert_id"), "ticket", {"ticket": t})
+
+    # 4 · decidir quién tría cada grupo; la política cierra lo inequívoco (salvo en live)
+    to_llm = []
     for g in groups:
-        rep = g[0]
-        aid = (rep.get("alert") or {}).get("alert_id", "?")
+        aid = (g[0].get("alert") or {}).get("alert_id", "?")
         hint = hints.get(aid)
         if mode == "live" or (mode == "normal" and not (hint and hint.get("decisive"))):
-            to_llm.append(rep)
+            to_llm.append(g)
         else:
-            t = deterministic_ticket(rep, store, hint)
-            step(aid, "ticket", {"verdict": t["verdict"], "severity": t["severity"], "by": t.get("x_mode")})
-            tickets_by_rep[aid] = t
+            finish(g, deterministic_ticket(g[0], store, hint))
 
-    # 5 · agente LLM (B) en paralelo
+    # 5 · agente LLM (B) en paralelo; cada ticket se emite en cuanto su alerta termina
     if to_llm:
-        from soc.triage.agent import triage_many
+        _run_llm(to_llm, hints, workers, use_cache, step, finish)
 
-        llm_tickets = triage_many(to_llm, workers=workers, on_step=step, use_cache=use_cache,
-                                  prefilter_hints={(c.get("alert") or {}).get("alert_id"): hints.get(
-                                      (c.get("alert") or {}).get("alert_id")) for c in to_llm})
-        for c, t in zip(to_llm, llm_tickets):
-            t["x_mode"] = t.get("x_mode") or ("no_ai_fallback" if t.get("x_no_ai") else "llm")
-            tickets_by_rep[(c.get("alert") or {}).get("alert_id")] = t
+    return [out_by_rep[(g[0].get("alert") or {}).get("alert_id")] for g in groups]
 
-    # 6 · ensamblar en orden + trazas
-    out = []
-    for g in groups:
-        aid = (g[0].get("alert") or {}).get("alert_id")
-        t = _merge_group(tickets_by_rep[aid], g)
-        if save_traces:
-            _save_trace(g[0], t)
-        out.append(t)
-    return out
+
+ALERT_TIMEOUT_S = int(os.getenv("ALERT_TIMEOUT", "150"))
+_AGENT_STEP = {"ia": "llm", "revisor": "reviewer"}
+
+
+def _run_llm(groups: list[list[dict]], hints: dict, workers: int, use_cache: bool,
+             step: Callable, finish: Callable) -> None:
+    from soc.triage.agent import fallback_ticket, triage
+
+    def one(group: list[dict]) -> tuple[list[dict], dict]:
+        ctx = group[0]
+        aid = (ctx.get("alert") or {}).get("alert_id", "?")
+        n_before = len(ctx.get("trace") or [])
+
+        def agent_step(a: str, s: str, info: dict) -> None:
+            if s in _AGENT_STEP:
+                msg = "IA analizando la alerta" if s == "ia" else "revisor crítico comprobando el veredicto"
+                step(a, _AGENT_STEP[s], {"message": msg + (f" ({info['chars']} car. de contexto)"
+                                                           if info.get("chars") else "")})
+            elif s == "error":  # el agente genera igualmente un ticket sin IA: no marcar la alerta como rota
+                step(a, "llm", {"message": f"IA no disponible ({info.get('error', '')[:120]}): ticket sin IA"})
+
+        t = triage(ctx, hints.get(aid), use_cache=use_cache, on_step=agent_step)
+        for e in (ctx.get("trace") or [])[n_before:]:
+            step(aid, "reviewer" if e.get("step") == "review" else "llm", {"trace_entry": e})
+        t["x_mode"] = "no_ai_fallback" if t.get("x_no_ai") else "llm"
+        return group, t
+
+    pool = cf.ThreadPoolExecutor(max_workers=max(1, workers))
+    futs = {pool.submit(one, g): g for g in groups}
+    done: set[int] = set()
+    budget = ALERT_TIMEOUT_S + 30 * (len(groups) // max(1, workers))
+    try:
+        for fut in cf.as_completed(futs, timeout=budget):
+            g = futs[fut]
+            try:
+                group, t = fut.result()
+            except Exception as e:  # noqa: BLE001
+                group, t = g, fallback_ticket(g[0], hints.get((g[0].get("alert") or {}).get("alert_id")), str(e))
+                t["x_mode"] = "no_ai_fallback"
+            finish(group, t)
+            done.add(id(g))
+    except cf.TimeoutError:
+        log.warning("Timeout global del triaje con IA (%ss)", budget)
+    for fut, g in futs.items():
+        if id(g) not in done:
+            aid = (g[0].get("alert") or {}).get("alert_id")
+            step(aid, "llm", {"message": "timeout de la IA: ticket sin IA"})
+            t = fallback_ticket(g[0], hints.get(aid), "timeout")
+            t["x_mode"] = "no_ai_fallback"
+            finish(g, t)
+    pool.shutdown(wait=False, cancel_futures=True)
+
+
+def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, random: int = 0,
+                on_step: OnStep | None = None, workers: int = 5) -> list[dict]:
+    """Punto de entrada del dashboard (contrato docs/04): tría en directo, IA en todas, progreso paso a paso."""
+    store = get_store()
+    sel = list(alerts or [])
+    for i, a in enumerate(sel):
+        a.setdefault("alert_id", f"ALR-NUEVA-{i + 1:04d}")
+    if ids:
+        sel += select_alerts(store, ids=",".join(ids))
+    if random:
+        sel += select_alerts(store, random_n=random)
+    tickets = run(sel, mode="live", workers=workers, store=store, on_step=on_step)
+    _append_tickets(tickets)
+    return tickets
+
+
+def _append_tickets(tickets: list[dict], path: Path | None = None) -> None:
+    """Añade tickets a output/tickets.jsonl sustituyendo los de las mismas alertas (re-triaje)."""
+    path = path or config.OUTPUT_DIR / "tickets.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    new_ids = {i for t in tickets for i in t.get("alert_ids", [])}
+    keep = []
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    t = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not new_ids & set(t.get("alert_ids", [])):
+                    keep.append(line)
+    with open(path, "w", encoding="utf-8") as f:
+        for line in keep:
+            f.write(line + "\n")
+        for t in tickets:
+            f.write(json.dumps(t, ensure_ascii=False, default=str) + "\n")
 
 
 def _save_trace(ctx: dict, ticket: dict) -> None:
@@ -254,9 +356,14 @@ def main() -> None:
     live_print = mode == "live" or len(alerts) <= 20
 
     def on_step(aid: str, step: str, info: dict) -> None:
-        if live_print and step in ("ia", "revisor", "ticket", "error"):
-            extra = {"ticket": f"{info.get('verdict')} / {info.get('severity')}", "error": info.get("error", "")}.get(step, "")
-            print(f"  [{time.perf_counter() - t0:6.1f}s] {aid:<22} {step:<8} {extra}", flush=True)
+        if not live_print or info.get("trace_entry") or step in ("context", "policy"):
+            return
+        if step == "ticket":
+            t = info.get("ticket") or {}
+            extra = f"{t.get('verdict')} / {t.get('severity')}"
+        else:
+            extra = info.get("error") or info.get("message") or ""
+        print(f"  [{time.perf_counter() - t0:6.1f}s] {aid:<22} {step:<8} {extra}", flush=True)
 
     print(f"Triando {len(alerts)} alertas en modo {mode}…")
     t0 = time.perf_counter()

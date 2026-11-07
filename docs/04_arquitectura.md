@@ -286,7 +286,8 @@ paralelo midiendo el tiempo. Hay que ejecutarlo en cada punto de integración: e
 from soc.pipeline import run, load_alert_file
 tickets = run(alerts, mode="live", workers=5, on_step=lambda alert_id, step, info: ...)
 # mode: "live" (IA en todas, la política como pista) | "normal" (IA solo si la política no decide) | "no_llm"
-# pasos de on_step: contexto → politica → prefiltro → ia → revisor → ticket   (o "error")
+# pasos de on_step: context → policy → llm → reviewer → ticket (o "error"); data = {trace_entry?, ticket?, error?, message?}
+# triage_live(alerts=…, ids=…, random=N, on_step=…) = run(mode="live") + añade a output/tickets.jsonl (para el dashboard)
 ```
 - Escribe `output/tickets.jsonl` y `output/traces/<alert_id>.json` (traza + contexto completo, para el dashboard).
 - `x_mode` en cada ticket: `policy` (decidido por la política) | `llm` | `no_ai_fallback` | `pending_ai`.
@@ -307,7 +308,7 @@ uvicorn dashboard.server:app --port 8001              # http://localhost:8001
 # Sin pipeline todavía: DASHBOARD_SIMULATE=1 → triaje en vivo FALSO, marcado [SIMULADO], solo para probar la UI
 ```
 
-### Dashboard ↔ pipeline (Persona C ↔ Persona A) — PROPUESTA, pendiente de confirmar con A
+### Dashboard ↔ pipeline (Persona C ↔ Persona A) — ✅ IMPLEMENTADO por A (`soc.pipeline.triage_live`)
 El dashboard lee **solo de disco** (`output/tickets.jsonl`, `output/traces/*.json`, `output/incidents.jsonl` y,
 si existe, `output/metrics.json` con las métricas del batch). Si `output/tickets.jsonl` no existe, sirve
 `dashboard/sample/` y lo indica en la cabecera ("datos de EJEMPLO").
