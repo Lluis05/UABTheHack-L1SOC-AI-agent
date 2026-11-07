@@ -154,6 +154,112 @@ def dedup_groups(contexts: list[dict]) -> list[list[dict]]:
     return out
 
 
+# ------------------------------------------------------------ correlación
+INCIDENTS_FILE = "incidents.jsonl"           # dentro de config.OUTPUT_DIR (lo genera `python -m soc.correlate.incidents`)
+CLOSED_VERDICTS = {"false_positive", "benign_true_positive"}
+_incidents_lock = threading.Lock()
+_incidents_cache: dict[str, tuple[float, list[dict]]] = {}
+_incidents_warned: set[str] = set()
+
+
+def load_incidents(path: str | Path | None = None) -> list[dict]:
+    """Incidentes conocidos (output/incidents.jsonl). Se recarga si el fichero cambia; si no existe, []."""
+    path = Path(path) if path else config.OUTPUT_DIR / INCIDENTS_FILE
+    key = str(path)
+    with _incidents_lock:
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            if key not in _incidents_warned:
+                _incidents_warned.add(key)
+                log.warning("No hay %s: los tickets salen sin x_incident_id (generadlo con "
+                            "`python -m soc.correlate.incidents`)", path)
+            return []
+        cached = _incidents_cache.get(key)
+        if cached and cached[0] == mtime:
+            return cached[1]
+        incidents = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    incidents.append(json.loads(line))
+                except json.JSONDecodeError:
+                    log.warning("%s: línea ilegible ignorada", path.name)
+        _incidents_cache[key] = (mtime, incidents)
+        return incidents
+
+
+def link_incident(ctx: dict, ticket: dict, store: DataStore, incidents: list[dict]) -> str | None:
+    """Rellena ticket["x_incident_id"] con el incidente existente al que se une la alerta (attach() de D).
+    Las alertas cerradas como FP/benignas no se unen a incidentes (mismo criterio que candidate_alerts)."""
+    from soc.correlate.incidents import attach
+
+    if not incidents or ticket.get("verdict") in CLOSED_VERDICTS:
+        return ticket.get("x_incident_id")
+    alert = ctx.get("alert") or {}
+    # Alertas del dataset: el objeto original trae las entidades precalculadas (más rápido)
+    original = store.alert(alert.get("alert_id", "")) if alert.get("alert_id") else None
+    t0 = time.perf_counter()
+    try:
+        inc_id = attach(original or alert, incidents, store)
+    except Exception as e:  # noqa: BLE001 - la correlación nunca rompe el triaje
+        log.warning("attach falló para %s: %s", alert.get("alert_id"), e)
+        return ticket.get("x_incident_id")
+    if inc_id:
+        ticket["x_incident_id"] = inc_id
+        inc = next((i for i in incidents if i.get("incident_id") == inc_id), {})
+        ctx.setdefault("trace", []).append({
+            "step": "correlate", "source": "Correlación", "query": alert.get("alert_id"),
+            "result": f"se une a {inc_id} ({inc.get('severity')}, {len(inc.get('alert_ids') or [])} alertas)",
+            "ms": round((time.perf_counter() - t0) * 1000, 1)})
+    return inc_id
+
+
+BATCH_CORRELATE_MAX = 500   # por encima (p. ej. --all) se usa el CLI de soc.correlate.incidents
+
+
+def correlate_batch(contexts: list[dict], tickets: list[dict], store: DataStore,
+                    incidents: list[dict]) -> list[dict]:
+    """Correlación dentro del lote triado: alertas NUEVAS (p. ej. el JSON de la defensa) que no se unen a ningún
+    incidente conocido pero sí entre ellas forman incidentes nuevos. Devuelve los incidentes nuevos con id
+    correlativo a los existentes y rellena x_incident_id en sus tickets."""
+    from soc.correlate.incidents import correlate
+
+    ticket_of = {aid: t for t in tickets for aid in t.get("alert_ids") or []}
+    open_alerts = [a for c in contexts if (a := c.get("alert")) and a.get("alert_id") and a.get("created_at")
+                   and (t := ticket_of.get(a["alert_id"])) and t.get("verdict") not in CLOSED_VERDICTS
+                   and not t.get("x_incident_id")]
+    if len(open_alerts) < 2:
+        return []
+    try:
+        new = correlate(open_alerts, store, tickets=tickets)
+    except Exception as e:  # noqa: BLE001 - la correlación nunca rompe el triaje
+        log.warning("correlación del lote falló: %s", e)
+        return []
+    nums = [int(i["incident_id"].rsplit("-", 1)[1]) for i in incidents
+            if str(i.get("incident_id", "")).rsplit("-", 1)[-1].isdigit()]
+    n = max(nums, default=0)
+    for inc in new:
+        n += 1
+        inc["incident_id"] = f"INC-{n:04d}"
+        inc["x_live"] = True                    # creado en directo a partir del lote triado
+        for aid in inc["alert_ids"]:
+            if t := ticket_of.get(aid):
+                t["x_incident_id"] = inc["incident_id"]
+    return new
+
+
+def save_incidents(new: list[dict], path: str | Path | None = None) -> None:
+    """Añade incidentes nuevos a output/incidents.jsonl (el dashboard los muestra y los siguientes lotes se unen)."""
+    if not new:
+        return
+    path = Path(path) if path else config.OUTPUT_DIR / INCIDENTS_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _incidents_lock, open(path, "a", encoding="utf-8") as f:
+        for inc in new:
+            f.write(json.dumps(inc, ensure_ascii=False, default=str) + "\n")
+
+
 def _merge_group(ticket: dict, group: list[dict]) -> dict:
     if len(group) > 1:
         ids = [(c.get("alert") or {}).get("alert_id") for c in group]
@@ -165,13 +271,19 @@ def _merge_group(ticket: dict, group: list[dict]) -> dict:
 # ------------------------------------------------------------------ núcleo
 def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store: DataStore | None = None,
         on_step: OnStep | None = None, dedup: bool | None = None, use_cache: bool | None = None,
-        save_traces: bool = True, api: SocApi | None | bool = None) -> list[dict]:
+        save_traces: bool = True, api: SocApi | None | bool = None,
+        incidents: list[dict] | None = None, correlate_new: bool = True,
+        save_incidents_file: bool | None = None) -> list[dict]:
     """Tría alertas. mode: 'live' (IA en todas) | 'normal' (IA solo si hace falta) | 'no_llm'.
 
     api: API del SOC como respaldo del enriquecimiento (lo que no esté en local). Por defecto solo en 'live';
-    en los lotes grandes todo es local para no saturar la API."""
+    en los lotes grandes todo es local para no saturar la API.
+    incidents: incidentes a los que unir las alertas (x_incident_id); por defecto, output/incidents.jsonl.
+    correlate_new: además, agrupar en incidentes NUEVOS las alertas del lote relacionadas entre sí
+    (save_incidents_file: añadirlos a output/incidents.jsonl; por defecto solo en 'live')."""
     assert mode in ("live", "normal", "no_llm"), mode
     store = store or get_store()
+    incidents = load_incidents() if incidents is None else incidents
     if api is None or api is True:
         api = get_api() if (mode == "live" or api is True) else None
     hybrid = HybridStore(store, api) if api else None
@@ -239,6 +351,10 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
         t = _merge_group(t, group)
         if t.get("triage_seconds") is None and rep.get("build_ms") is not None:
             t["triage_seconds"] = round(rep["build_ms"] / 1000, 3)  # decidido por la política: solo contexto
+        n_trace = len(rep.get("trace") or [])
+        link_incident(rep, t, store, incidents)
+        for e in (rep.get("trace") or [])[n_trace:]:
+            step(aid, "policy", {"trace_entry": e})
         if save_traces:
             _save_trace(rep, t)
         warns = (rep.get("alert") or {}).get("x_input_warnings")
@@ -263,7 +379,17 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
     if to_llm:
         _run_llm(to_llm, hints, workers, use_cache, step, finish)
 
-    return [out_by_rep[(g[0].get("alert") or {}).get("alert_id")] for g in groups]
+    tickets = [out_by_rep[(g[0].get("alert") or {}).get("alert_id")] for g in groups]
+    # 6 · alertas nuevas relacionadas entre sí → incidentes nuevos (los conocidos ya se unieron con attach)
+    if correlate_new and len(contexts) <= BATCH_CORRELATE_MAX:
+        new_incidents = correlate_batch(contexts, tickets, store, incidents)
+        if mode == "live" if save_incidents_file is None else save_incidents_file:
+            save_incidents(new_incidents)
+        for inc in new_incidents:
+            for aid in inc["alert_ids"]:
+                step(aid, "policy", {"message": f"correlación: forma el incidente nuevo {inc['incident_id']} "
+                                                f"con {len(inc['alert_ids'])} alertas del lote"})
+    return tickets
 
 
 ALERT_TIMEOUT_S = int(os.getenv("ALERT_TIMEOUT", "150"))

@@ -70,3 +70,56 @@ def test_triage_live_contract_with_dashboard(monkeypatch, tmp_path):
     assert any(d.get("trace_entry") for _, _, d in events)
     assert [s for _, s, d in events if d.get("ticket")] == ["ticket"]
     assert (tmp_path / "tickets.jsonl").exists()
+
+
+# ------------------------------------------------------------- correlación (x_incident_id)
+def _truth(inc_id):
+    from pathlib import Path
+    f = Path(__file__).resolve().parents[1] / "eval" / "incidents_truth.jsonl"
+    return next(t for t in map(json.loads, f.read_text(encoding="utf-8").splitlines()) if t["incident_id"] == inc_id)
+
+
+def test_link_incident_joins_known_incident_but_not_closed_tickets():
+    import copy
+    from soc.correlate.incidents import correlate
+    from soc.pipeline import link_incident
+
+    s = get_store()
+    incs = correlate([s.alert(i) for i in _truth("INC-02")["alert_ids"]], s)
+    new = copy.deepcopy(s.alert("ALR-20261008-011789"))
+    new["alert_id"] = "ALR-NUEVA-0001"
+    ctx = {"alert": new, "trace": []}
+    t = {"verdict": "true_positive", "x_incident_id": None}
+    assert link_incident(ctx, t, s, incs) == incs[0]["incident_id"] == t["x_incident_id"]
+    assert ctx["trace"][-1]["step"] == "correlate"
+    closed = {"verdict": "false_positive", "x_incident_id": None}
+    assert link_incident({"alert": new}, closed, s, incs) is None and closed["x_incident_id"] is None
+
+
+def test_correlate_batch_builds_incident_from_new_alerts_only():
+    """Simula el JSON de la defensa: alertas con ids que no existen en el dataset y sin incidentes conocidos."""
+    import copy
+    from soc.pipeline import correlate_batch
+
+    s = get_store()
+    alerts = []
+    for n, aid in enumerate(_truth("INC-01")["alert_ids"], 1):
+        a = copy.deepcopy(s.alert(aid))
+        a["alert_id"] = f"ALR-DEMO-{n:04d}"
+        alerts.append(a)
+    contexts = [{"alert": a} for a in alerts]
+    tickets = [{"ticket_id": f"T-{a['alert_id']}", "alert_ids": [a["alert_id"]], "verdict": "true_positive",
+                "severity": "high", "x_incident_id": None} for a in alerts]
+    known = [{"incident_id": "INC-0007"}]
+    new = correlate_batch(contexts, tickets, s, known)
+    assert [i["incident_id"] for i in new] == ["INC-0008"] and new[0]["x_live"]
+    assert {t["x_incident_id"] for t in tickets} == {"INC-0008"}
+
+
+def test_load_incidents_missing_file_is_empty(tmp_path):
+    from soc.pipeline import load_incidents, save_incidents
+
+    f = tmp_path / "incidents.jsonl"
+    assert load_incidents(f) == []
+    save_incidents([{"incident_id": "INC-0001", "alert_ids": ["A"]}], f)
+    assert [i["incident_id"] for i in load_incidents(f)] == ["INC-0001"]

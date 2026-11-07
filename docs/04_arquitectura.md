@@ -277,6 +277,17 @@ Campos extra: `linking_entities` (qué une las alertas), `x_why` (por qué es in
 `x_tactics` (cadena de ≥ 2 fases → severidad +1, política §5). CLI: `python -m soc.correlate.incidents [--truth]`
 (usa `output/tickets_all_nollm.jsonl` de `python -m soc.pipeline --all --no-llm --out output/tickets_all_nollm.jsonl`).
 
+**Integración en el pipeline ✅ (Persona A, `soc/pipeline.py`):** `run()` rellena `x_incident_id` en dos pasos, solo en
+tickets que no son FP/benignos:
+1. `link_incident()` → `attach()` contra los incidentes conocidos (`load_incidents()` lee `output/incidents.jsonl`;
+   si no existe, `[]` y aviso). Añade a la traza un paso `correlate` (fuente "Correlación").
+2. `correlate_batch()` → `correlate()` sobre las alertas del **propio lote** que no se unieron a nada. Es lo que hace
+   útil la correlación con el JSON nuevo de la defensa, cuyas alertas no están en nuestros incidentes. Los
+   incidentes nuevos llevan `x_live: true`, siguen la numeración (`INC-00NN`) y, en modo `live`, se añaden a
+   `output/incidents.jsonl` (los ve el dashboard y los lotes siguientes se unen a ellos).
+Parámetros nuevos de `run()`: `incidents=None` (por defecto el fichero), `correlate_new=True`,
+`save_incidents_file=None` (por defecto solo en `live`). Lotes de más de 500 alertas no se correlan aquí (usar el CLI).
+
 **Informe de nivel 3 ✅ (Persona D, `soc/correlate/investigate.py`):** `investigate(incident, store) -> report` con el
 esquema `informe_incidente.schema.json`. `incident_id`/`alert_ids` los pone el código, los `event_id` de la
 cronología se validan contra la evidencia y `containment_plan[].approver` lo decide `soc.policy.approvals`. Sin IA →
