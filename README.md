@@ -120,9 +120,10 @@ La capa LLM (`soc/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDERS`
 
 ## 👥 Equipo
 
-- **Lluis Sarries** — [@Lluis05](https://github.com/Lluis05)
-- _(compañero 2)_
-- _(compañero 3)_
+- **Lluis Sarries**
+- **Adrián Valverde Ambrosio**
+- **Marc Cantero Priego**
+- **Izan Caballer Jimenez**
 
 ---
 
