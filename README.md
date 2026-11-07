@@ -120,7 +120,7 @@ La capa LLM (`soc/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDERS`
 
 ## 👥 Equipo
 
-- **Lluis Sarries**
+- **Lluis Sarries Mas**
 - **Adrián Valverde Ambrosio**
 - **Marc Cantero Priego**
 - **Izan Caballer Jimenez**
