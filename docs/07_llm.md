@@ -69,3 +69,9 @@ Los contextos pueden ser enormes (logs ±24 h). Antes de enviarlos al LLM:
 - Limitar a unos 30 eventos por entidad y fuente, priorizando los cercanos en el tiempo y los que coinciden con IOCs.
 - Quitar campos vacíos y acortar strings largos (más de 500 caracteres).
 - Objetivo: menos de 15.000 tokens por alerta.
+
+## Chat IA del ticket (dashboard, Gemini)
+Asistente de consulta sobre un ticket ya triado (por qué se cerró/escaló, reglas, severidad, evidencias, quién decidió).
+Va **directo a la API de Gemini** (`dashboard/chat.py`), no pasa por `soc/llm.py` ni gasta cuota de Claude Code. Aplica
+las mismas defensas de esta página: `<untrusted_data>` con `escape_untrusted`, system prompt que prohíbe obedecer los
+datos, y **sin herramientas** (no puede contener ni decidir). Detalle completo en [12_chatbot.md](12_chatbot.md).

@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from dashboard import chat
 from dashboard import containment
 from dashboard import policy
 from dashboard import settings as s
@@ -49,7 +50,8 @@ def config() -> dict:
     """Constantes que el frontend no debe duplicar."""
     return {"api_actions": sorted(policy.API_ACTIONS),
             "live_steps": list(s.LIVE_STEPS), "live_target_seconds": s.LIVE_TARGET_SECONDS,
-            "max_live_alerts": s.MAX_LIVE_ALERTS, "manual_minutes_per_alert": s.MINUTES_PER_ALERT_MANUAL}
+            "max_live_alerts": s.MAX_LIVE_ALERTS, "manual_minutes_per_alert": s.MINUTES_PER_ALERT_MANUAL,
+            "chat_max_question_chars": s.CHAT_MAX_QUESTION_CHARS, "chat_max_turns": s.CHAT_MAX_TURNS}
 
 
 @app.get("/api/health")
@@ -136,6 +138,27 @@ def decide(ticket_id: str, req: StatusDecision) -> dict:
     """Cierre, escalado o reapertura manual (y opcionalmente corrección del veredicto)."""
     _ticket_or_404(ticket_id)
     return store.record_decision({"ticket_id": ticket_id, **req.model_dump()})
+
+
+# --------------------------------------------------------------------------- chat del ticket (Gemini)
+class ChatMessage(BaseModel):
+    role: str = Field(pattern="^(" + "|".join(chat.ROLES) + ")$")
+    text: str
+
+
+class ChatRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=s.CHAT_MAX_QUESTION_CHARS)
+    history: list[ChatMessage] = []
+
+
+@app.post("/api/tickets/{ticket_id}/chat")
+def ticket_chat(ticket_id: str, req: ChatRequest) -> dict:
+    """Pregunta en lenguaje natural sobre un ticket. Solo lectura: no cambia el ticket ni ejecuta acciones."""
+    ticket = _ticket_or_404(ticket_id)
+    try:
+        return chat.ask(ticket, store.trace(ticket), req.question, [m.model_dump() for m in req.history])
+    except chat.ChatError as e:
+        raise HTTPException(e.status, e.detail) from e
 
 
 # --------------------------------------------------------------------------- triaje en directo

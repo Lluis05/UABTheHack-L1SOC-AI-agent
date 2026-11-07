@@ -1,11 +1,12 @@
-import { AppAlert, AppButton, AppCard, AppChip, AppRing, AppStack, AppText } from '../base'
+import { AppAlert, AppButton, AppCard, AppChip, AppIcon, AppRing, AppStack, AppText } from '../base'
 import { chipProps } from '../../utils/chips.js'
 import { formatSeconds, toPercent } from '../../utils/format.js'
 
 const DECIDED_FIELDS = [['verdict', 'Veredicto'], ['severity', 'Severidad'], ['actions', 'Acciones'], ['status', 'Estado']]
 
 // Cabecera compacta del ticket: todo en filas horizontales de tags, sin texto explicativo.
-export default function TicketHeader({ ticket: t, onExpand, onClose }) {
+// onAsk: abre el chat con la IA sobre el ticket (pestaña «Chat IA» del modal).
+export default function TicketHeader({ ticket: t, onExpand, onAsk, onClose }) {
   const decided = t.x_decided_by || {}
   return (
     <AppCard>
@@ -31,6 +32,9 @@ export default function TicketHeader({ ticket: t, onExpand, onClose }) {
             <AppChip key={key} {...chipProps('decider', decided[key])} label={`${label}: ${chipProps('decider', decided[key]).label}`} />
           ))}
           <AppStack direction="row" gap={1} grow justify="flex-end">
+            {onAsk ? (
+              <AppButton variant="link" onClick={onAsk} startIcon={<AppIcon name="chat" tone="llm" />}>Preguntar a la IA</AppButton>
+            ) : null}
             <AppButton variant="link" onClick={onExpand}>Ver todo</AppButton>
             <AppButton onClick={onClose} aria-label="Cerrar el detalle y volver a la cola completa">Volver a la cola</AppButton>
           </AppStack>

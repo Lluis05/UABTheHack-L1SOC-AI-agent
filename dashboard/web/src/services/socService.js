@@ -13,6 +13,7 @@ export const socService = {
   containmentLog: () => request('GET', '/containment/log'),
   runContainment: (ticketId, body) => request('POST', `${ticketPath(ticketId)}/containment`, body),
   decide: (ticketId, body) => request('POST', `${ticketPath(ticketId)}/decision`, body),
+  chat: (ticketId, body) => request('POST', `${ticketPath(ticketId)}/chat`, body),
   startTriage: (body) => request('POST', '/triage', body),
   triageStatus: (jobId) => request('GET', `/triage/${encodeURIComponent(jobId)}`),
 }
