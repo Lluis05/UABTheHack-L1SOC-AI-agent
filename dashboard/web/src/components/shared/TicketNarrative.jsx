@@ -1,40 +1,72 @@
-import { AppCard, AppChip, AppStack, AppText } from '../base'
+import { AppCard, AppChip, AppKeyValueTable, AppStack, AppText } from '../base'
 import { chipProps } from '../../utils/chips.js'
+import { toPercent } from '../../utils/format.js'
 import { affectedGroups } from '../../utils/tickets.js'
+import { CodeTags, Tags } from './TagList.jsx'
 
-// Resumen para N2, entidades afectadas, severidad razonada, MITRE, escalado y preguntas abiertas.
+// Ancho de lectura cómodo para el texto del resumen
+const READING_WIDTH = '78ch'
+
+// Resumen para N2, con la misma forma que la ficha del ticket: el texto arriba y debajo una fila por dato
+// (veredicto, severidad razonada, entidades afectadas, MITRE, escalado y preguntas abiertas).
+// En el modal hay sitio: los tags se ven todos, sin «+N».
 export default function TicketNarrative({ ticket: t }) {
-  return (
-    <AppCard title="Resumen para N2">
-      <AppStack gap={1.5}>
-        <AppText>{t.summary}</AppText>
-        {affectedGroups(t.affected).map(([label, values]) => (
-          <AppStack key={label} direction="row" gap={0.5} wrap>
-            <AppText variant="caption" tone="muted">{label}</AppText>
-            {values.map((v) => <AppChip key={v} label={v} variant="code" />)}
-          </AppStack>
-        ))}
-        <AppStack direction="row" gap={1} align="flex-start">
-          <AppChip {...chipProps('decider', t.x_decided_by?.severity)} />
-          <AppText><AppText as="span" variant="strong">Severidad: </AppText>{t.severity_rationale || 'sin justificación.'}</AppText>
+  const decided = t.x_decided_by || {}
+  const rows = [
+    {
+      key: 'verdict', icon: 'verdict', label: 'Veredicto',
+      value: (
+        <Tags>
+          <AppChip {...chipProps('verdict', t.verdict)} />
+          <DecidedBy decider={decided.verdict} />
+          {t.confidence != null ? <AppText as="span" tone="muted">{toPercent(t.confidence)} % de confianza</AppText> : null}
+        </Tags>
+      ),
+    },
+    {
+      key: 'severity', icon: 'severity', label: 'Severidad',
+      value: (
+        <AppStack gap={0.5}>
+          <Tags>
+            <AppChip {...chipProps('severity', t.severity)} />
+            <DecidedBy decider={decided.severity} />
+          </Tags>
+          <AppText tone="muted">{t.severity_rationale || 'Sin justificación.'}</AppText>
         </AppStack>
-        {t.mitre?.length > 0 ? (
-          <AppStack direction="row" gap={0.5} wrap>
-            <AppText variant="caption" tone="muted">MITRE ATT&CK</AppText>
-            {t.mitre.map((m) => <AppChip key={m} label={m} variant="code" />)}
-          </AppStack>
-        ) : null}
-        <AppText>
-          <AppText as="span" variant="strong">Escalado: </AppText>
-          {t.escalation?.escalate ? `a ${t.escalation.to}. ${t.escalation.reason}` : 'no se escala.'}
-        </AppText>
-        {t.open_questions?.length > 0 ? (
-          <AppStack gap={0.25}>
-            <AppText variant="strong">Preguntas abiertas</AppText>
-            {t.open_questions.map((q) => <AppText key={q}>{q}</AppText>)}
-          </AppStack>
-        ) : null}
-      </AppStack>
-    </AppCard>
+      ),
+    },
+    ...affectedGroups(t.affected).map(([label, values, icon]) => ({ key: label, icon, label, value: <CodeTags values={values} /> })),
+    { key: 'mitre', icon: 'mitre', label: 'MITRE', value: <CodeTags values={t.mitre} /> },
+    {
+      key: 'escalation', icon: 'escalation', label: 'Escalado',
+      value: t.escalation?.escalate ? (
+        <AppStack gap={0.5}>
+          <Tags><AppChip label={t.escalation.to} tone="sevHigh" /></Tags>
+          {t.escalation.reason ? <AppText tone="muted">{t.escalation.reason}</AppText> : null}
+        </AppStack>
+      ) : <AppText tone="muted">No se escala</AppText>,
+    },
+    {
+      key: 'questions', icon: 'question', label: 'Preguntas',
+      value: t.open_questions?.length ? (
+        <AppStack gap={0.75}>{t.open_questions.map((q) => <AppText key={q}>{q}</AppText>)}</AppStack>
+      ) : <AppText tone="muted">—</AppText>,
+    },
+  ]
+
+  return (
+    <AppStack gap={1.5}>
+      <AppCard title="Resumen para N2">
+        <AppText style={{ maxWidth: READING_WIDTH }}>{t.summary || '—'}</AppText>
+      </AppCard>
+      <AppCard>
+        <AppKeyValueTable rows={rows} label={`Resumen de ${t.ticket_id}`} />
+      </AppCard>
+    </AppStack>
   )
+}
+
+// Quién decidió el campo (Política / IA / Persona), con su color
+function DecidedBy({ decider }) {
+  return decider ? <AppChip {...chipProps('decider', decider)} title="Quién lo decidió" /> : null
 }

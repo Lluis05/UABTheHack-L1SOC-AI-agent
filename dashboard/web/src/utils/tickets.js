@@ -122,10 +122,11 @@ export function approversLabel(action) {
   return (action.x_approval?.approvers || []).join(' + ')
 }
 
+// Grupos de entidades afectadas: [etiqueta, valores, icono]
 export function affectedGroups(affected = {}) {
   return [
-    ['Usuarios', affected.users], ['Hosts', affected.hosts],
-    ['Servicios', affected.business_services], ['Clientes', affected.customers],
+    ['Usuarios', affected.users, 'user'], ['Hosts', affected.hosts, 'host'],
+    ['Servicios', affected.business_services, 'service'], ['Clientes', affected.customers, 'customer'],
   ].filter(([, values]) => values?.length)
 }
 

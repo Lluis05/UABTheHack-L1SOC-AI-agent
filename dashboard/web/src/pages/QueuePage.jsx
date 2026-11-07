@@ -48,8 +48,9 @@ export default function QueuePage({ tickets, loading, metrics, config, approver,
   let body
   if (loading) body = <AppSkeletonRows rows={SKELETON_ROWS} label="Cargando la cola" />
   else if (ticket) {
-    // key: la conversación y el estado de la ficha son de un ticket; al cambiar de ticket empiezan de cero
-    body = <TicketWorkspace key={ticket.ticket_id} ticket={ticket} queue={queue} config={config} approver={approver}
+    // Sin key: al cambiar de ticket la cola no se vuelve a montar (conserva su scroll); lo que es de un ticket
+    // (la ficha y la conversación) empieza de cero por su cuenta
+    body = <TicketWorkspace ticket={ticket} queue={queue} config={config} approver={approver}
                             onChanged={onChanged} onClose={() => onSelect(null)} />
   } else if (stacked) body = queue('grid')
   else {
@@ -59,12 +60,13 @@ export default function QueuePage({ tickets, loading, metrics, config, approver,
 
   return (
     <AppStack gap={2}>
-      {ticket ? null : <MetricsBar metrics={metrics} />}
+      {ticket ? null : <MetricsBar metrics={metrics} tickets={tickets} />}
       {/* En móvil, con un ticket abierto, la pantalla es solo la ficha. Cargando, no hay nada que contar ni filtrar */}
       {(ticket && stacked) || loading ? null : (
         <TicketFilters filters={filters} onChange={setFilters} sort={sort}
                        onSortChange={(key) => setSort({ key, direction: SORT_DIR.DESC })} shown={rows.length}
-                       total={tickets.length} pendingClose={pendingCloseCount(tickets)} fresh={fresh} />
+                       total={tickets.length} pendingClose={pendingCloseCount(tickets)} fresh={fresh}
+                       onBack={ticket ? () => onSelect(null) : undefined} />
       )}
       {body}
     </AppStack>
@@ -94,14 +96,14 @@ function TicketWorkspace({ ticket, queue, config, approver, onChanged, onClose }
   return (
     <AppSplit
       layout={layout} onLayoutChange={updateLayout} limits={PANE_LIMITS} leftLabel="Cola de tickets" asideLabel="Asistente IA"
-      onAsideClose={() => setChatOpen(false)}
+      onAsideClose={() => setChatOpen(false)} rightKey={ticket.ticket_id}
       left={queue(layout.leftWidth < COMPACT_QUEUE_BELOW_PX ? 'compact' : 'column')}
-      right={<TicketDetail ticket={ticket} config={config} approver={approver} onChanged={onChanged} onClose={onClose}
+      right={<TicketDetail key={ticket.ticket_id} ticket={ticket} config={config} approver={approver} onChanged={onChanged} onClose={onClose}
                            chatOpen={asideVisible} onToggleChat={toggleChat} stickyDecision={stacked} />}
       aside={chatOpen ? (
         <AppSidePanel title="Asistente IA" icon="chat" tone="llm" label={`Chat sobre ${ticket.ticket_id}`}
                       onClose={() => setChatOpen(false)} closeLabel="Cerrar el asistente">
-          <TicketChat chat={chat} maxChars={config?.chat_max_question_chars} />
+          <TicketChat key={ticket.ticket_id} chat={chat} maxChars={config?.chat_max_question_chars} />
         </AppSidePanel>
       ) : null}
     />

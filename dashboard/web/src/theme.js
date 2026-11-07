@@ -59,6 +59,10 @@ export const themeOptions = {
     llm: tone(PALETTE.llm),
     human: tone(PALETTE.human),
     surface: { main: PALETTE.raised, selected: '#1f2a44' },
+    // Gráficas del panel de métricas: los mismos tonos Política / IA / Persona un paso más oscuros, validados con
+    // el validador de dataviz sobre la superficie oscura (banda de luminosidad, daltonismo y visión normal).
+    // bar: barras de una sola serie (magnitud).
+    chart: { policy: '#9a6cf0', llm: '#1a97a8', human: '#79a02f', bar: '#5f7fe8' },
   },
   shape: { borderRadius: 6 },
   typography: {
@@ -76,7 +80,7 @@ export const themeOptions = {
   // vivo: si la cabecera cambia de alto, nada se descuadra.
   layout: {
     headerHeight: HEADER_HEIGHT, bottomNavHeight: BOTTOM_NAV_HEIGHT,
-    queueMaxHeight: 'calc(100dvh - var(--header-h) - var(--bottom-nav-h) - 128px)', logMaxHeight: 260,
+    logMaxHeight: 260,
     // La cola a pantalla completa (tabla): ocupa hasta el borde inferior
     queueTableMaxHeight: 'calc(100dvh - var(--header-h) - var(--bottom-nav-h) - 200px)',
     ticketCardMinWidth: 300, ticketCardHeight: 132,
@@ -84,8 +88,6 @@ export const themeOptions = {
     detailMaxWidth: 1400,
     // Modal de información extendida: alto fijo proporcional a la pantalla
     dialogLgHeight: '80dvh',
-    // Panel lateral del asistente: fijo bajo la cabecera y hasta el borde inferior de la pantalla
-    sidePanelTop: 'calc(var(--header-h) + 16px)', sidePanelHeight: 'calc(100dvh - var(--header-h) - 32px)',
     // Asistente como cajón (por debajo de lg): ancho a la derecha; en móvil, hoja inferior
     asideDrawerWidth: 440, asideSheetHeight: '85dvh',
     // Upload: la zona de entrada y el progreso tienen alto fijo (no saltan al cambiar de modo ni al llegar alertas)

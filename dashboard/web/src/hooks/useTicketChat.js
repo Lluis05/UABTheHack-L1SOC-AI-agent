@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CHAT_DEFAULT_MAX_TURNS, CHAT_ROLE } from '../config/constants.js'
 import { socService } from '../services/socService.js'
 import { chatMessage, toHistory } from '../utils/chat.js'
@@ -8,6 +8,16 @@ import { chatMessage, toHistory } from '../utils/chat.js'
 export function useTicketChat(ticketId, maxTurns = CHAT_DEFAULT_MAX_TURNS) {
   const [messages, setMessages] = useState([])
   const [busy, setBusy] = useState(false)
+  const current = useRef(ticketId)
+
+  // Otro ticket, otra conversación (el panel no se vuelve a montar al cambiar de ticket)
+  useEffect(() => {
+    current.current = ticketId
+    setMessages([])
+    setBusy(false)
+  }, [ticketId])
+  // Una respuesta que llega tarde de otro ticket no se mezcla con esta conversación
+  const stillHere = () => current.current === ticketId
 
   async function ask(question) {
     const q = question.trim()
@@ -17,11 +27,11 @@ export function useTicketChat(ticketId, maxTurns = CHAT_DEFAULT_MAX_TURNS) {
     setBusy(true)
     try {
       const res = await socService.chat(ticketId, { question: q, history })
-      setMessages((m) => [...m, chatMessage(CHAT_ROLE.MODEL, res.answer)])
+      if (stillHere()) setMessages((m) => [...m, chatMessage(CHAT_ROLE.MODEL, res.answer)])
     } catch (e) {
-      setMessages((m) => [...m, chatMessage(CHAT_ROLE.ERROR, e.message)])
+      if (stillHere()) setMessages((m) => [...m, chatMessage(CHAT_ROLE.ERROR, e.message)])
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AppButton, AppChip, AppDialog, AppGrid, AppIconButton, AppSelect, AppStack, AppText, AppTextField } from '../base'
+import { AppButton, AppChip, AppDialog, AppGrid, AppIcon, AppIconButton, AppSelect, AppStack, AppText, AppTextField } from '../base'
 import {
   CUSTOM_SORT_LABEL, DECIDER, PENDING_CLOSE, PENDING_CLOSE_LABEL, QUEUE_SEARCH_ID, QUEUE_SORTS, SEVERITY_ORDER, SORT_DIR,
   STATUS_ORDER, VERDICT_ORDER,
@@ -25,7 +25,10 @@ const FILTER_SELECTS = [
 // N1 ejecute sus acciones. fresh: tickets nuevos del último refresco (se anuncian, la vista no salta).
 // sort {key, direction}: el selector muestra el atajo que coincide o «Por columna» si viene de una cabecera.
 // onSortChange(key): elige un atajo (siempre de mayor a menor).
-export default function TicketFilters({ filters, onChange, sort, onSortChange, shown, total, pendingClose = 0, fresh = 0 }) {
+// onBack: con un ticket abierto, «Volver a la cola» al principio de la fila del recuento (bajo la búsqueda).
+export default function TicketFilters({
+  filters, onChange, sort, onSortChange, shown, total, pendingClose = 0, fresh = 0, onBack,
+}) {
   const sortPreset = sort.direction === SORT_DIR.DESC && QUEUE_SORTS.some((s) => s.value === sort.key) ? sort.key : ''
   const [open, setOpen] = useState(false)
   const active = activeFilterCount(filters)
@@ -53,6 +56,10 @@ export default function TicketFilters({ filters, onChange, sort, onSortChange, s
         ) : null}
       </AppStack>
       <AppStack direction="row" gap={1} wrap>
+        {onBack ? (
+          <AppButton variant="link" onClick={onBack} startIcon={<AppIcon name="back" tone="inherit" />}
+                     title="Cerrar el ticket y volver a la cola (Esc)">Volver a la cola</AppButton>
+        ) : null}
         {/* «Listas para cerrar» no lleva tag: el botón de la barra ya se ve pulsado */}
         {tags.map((f) => (
           <AppChip key={f.key} label={`${f.label}: ${chipProps(f.chip, filters[f.key]).label}`} onDelete={clear(f.key)} />

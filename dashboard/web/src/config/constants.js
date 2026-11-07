@@ -177,3 +177,10 @@ export const SHORTCUTS = [
   { keys: ['v'], label: 'Ver toda la información del ticket' },
   { keys: ['?'], label: 'Mostrar esta ayuda' },
 ]
+
+// Panel de métricas de la cola (utils/metrics.js, components/shared/MetricsPanel.jsx)
+export const CONFIDENCE_EDGES = [60, 70, 80, 90]   // % de confianza de la IA
+export const TRIAGE_EDGES_S = [15, 30, 45, 60]     // segundos de triaje por alerta
+export const TOP_N = 5                             // filas de los rankings (MITRE, reglas, acciones)
+export const MAX_TIMELINE_DAYS = 31                // días de la gráfica «Alertas por día»
+export const METRICS_CHARTS_KEY = 'metrics:charts' // gráficas desplegadas o no (se recuerda en el navegador)

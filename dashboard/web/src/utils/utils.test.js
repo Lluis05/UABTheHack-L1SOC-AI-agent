@@ -49,7 +49,7 @@ describe('acciones', () => {
     expect(findExecution({ action: 'block_ioc', target: '5.6.7.8' }, executed)).toBeUndefined()
   })
   it('agrupa solo las entidades afectadas no vacías', () => {
-    expect(affectedGroups({ users: ['u'], hosts: [] })).toEqual([['Usuarios', ['u']]])
+    expect(affectedGroups({ users: ['u'], hosts: [] })).toEqual([['Usuarios', ['u'], 'user']])
   })
 })
 

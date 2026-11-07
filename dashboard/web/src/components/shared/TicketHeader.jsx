@@ -1,5 +1,7 @@
 import { Fragment } from 'react'
-import { AppAlert, AppButton, AppCard, AppChip, AppIcon, AppRing, AppStack, AppText } from '../base'
+import {
+  AppAlert, AppButton, AppCard, AppChip, AppIcon, AppRing, AppStack, AppText, useLayoutMode,
+} from '../base'
 import { CHIP_KINDS, DETAIL_TITLE_ID } from '../../config/constants.js'
 import { chipProps } from '../../utils/chips.js'
 import { formatSeconds, toPercent } from '../../utils/format.js'
@@ -10,14 +12,19 @@ const DECIDED_FIELDS = [['verdict', 'Veredicto'], ['severity', 'Severidad'], ['a
 // veredicto): solo la severidad lleva color. Quién decidió cada campo va en una línea de texto pequeña, con el
 // nombre en su color (Política / IA / Persona), para no competir con la severidad.
 // onAsk: abre o cierra el chat con la IA sobre el ticket. chatOpen: si está abierto.
+// Volver: en escritorio, «Volver a la cola» está bajo la búsqueda (TicketFilters); en móvil la ficha es otra pantalla
+// y «← Cola» va delante, donde se espera el «atrás».
 export default function TicketHeader({ ticket: t, onExpand, onAsk, chatOpen = false, onClose }) {
+  const { stacked } = useLayoutMode()
   return (
     <AppCard>
       <AppStack gap={1.25}>
         {t.x_simulated ? <AppAlert tone="warning">Ticket simulado por el dashboard: no es un triaje real.</AppAlert> : null}
         <AppStack direction="row" gap={1} wrap>
-          <AppButton onClick={onClose} startIcon={<AppIcon name="back" tone="inherit" />} title="Volver a la cola (Esc)"
-                     aria-label="Cerrar el detalle y volver a la cola">Cola</AppButton>
+          {stacked ? (
+            <AppButton onClick={onClose} startIcon={<AppIcon name="back" tone="inherit" />} title="Volver a la cola (Esc)"
+                       aria-label="Cerrar el detalle y volver a la cola">Cola</AppButton>
+          ) : null}
           <AppText variant="mono" tone="muted">{t.ticket_id}</AppText>
           {t.x_incident_id ? <AppChip label={t.x_incident_id} variant="code" title="Incidente correlacionado" /> : null}
           <AppStack direction="row" gap={1} grow justify="flex-end" wrap>

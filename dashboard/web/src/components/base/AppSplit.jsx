@@ -3,7 +3,7 @@ import ButtonBase from '@mui/material/ButtonBase'
 import Drawer from '@mui/material/Drawer'
 import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampWidth, fitPanes } from '../../utils/panes.js'
 import AppIcon from './AppIcon.jsx'
 import { AsideModeContext, ASIDE_MODE } from './asideMode.js'
@@ -11,7 +11,10 @@ import useLayoutMode from './useLayoutMode.js'
 
 const GUTTER = 16    // separador entre columnas (zona de arrastre)
 const RAIL = 40      // ancho de una columna plegada
+const BOTTOM_GAP = 16  // aire entre las columnas y el borde inferior de la pantalla
 const SIDE = { LEFT: 'left', ASIDE: 'aside' }
+// Columna con scroll propio: el scroll no se encadena a la página al llegar al final
+const SCROLL_PANE = { minWidth: 0, height: '100%', overflowY: 'auto', overscrollBehavior: 'contain', pr: 0.5 }
 
 // Columnas ajustables: lista a la izquierda, detalle en el centro (se queda el espacio sobrante) y, opcional, una
 // tercera columna a la derecha (aside: el asistente). Los separadores se arrastran (o se mueven con ←/→ con el foco)
@@ -23,10 +26,14 @@ const SIDE = { LEFT: 'left', ASIDE: 'aside' }
 // layout: {leftWidth, asideWidth, leftCollapsed, asideCollapsed} (usePaneLayout) · onLayoutChange(patch)
 // limits: {leftMin, asideMin, centerMin, step} · leftLabel / asideLabel: nombre de cada columna (raíl y separador)
 // onAsideClose: cerrar el aside cuando va en cajón (clic fuera o Esc)
-export default function AppSplit({ left, right, aside, layout, onLayoutChange, limits, leftLabel, asideLabel, onAsideClose }) {
+// Escritorio: el área de columnas ocupa justo hasta el borde inferior de la pantalla y cada columna (lista, detalle,
+// aside) hace scroll por su cuenta; la página no se mueve mientras se trabaja.
+export default function AppSplit({ left, right, rightKey, aside, layout, onLayoutChange, limits, leftLabel, asideLabel, onAsideClose }) {
   const { stacked, asideDrawer, phone } = useLayoutMode()
   const container = useRef(null)
   const [width, setWidth] = useState(0)
+  const [top, setTop] = useState(0)
+  const detailPane = useRef(null)
 
   useEffect(() => {
     if (!container.current) return undefined
@@ -35,8 +42,27 @@ export default function AppSplit({ left, right, aside, layout, onLayoutChange, l
     return () => observer.disconnect()
   }, [stacked])
 
-  // Móvil: el detalle sustituye a la lista; sin esto se abriría a la altura a la que estaba la lista
-  useEffect(() => { if (stacked) window.scrollTo({ top: 0 }) }, [stacked])
+  // Dónde empieza el área de columnas en la página (lo de encima puede cambiar de alto: filtros, avisos...).
+  // Se observa el contenedor padre: si cambia lo de arriba, cambia su alto y se vuelve a medir.
+  useLayoutEffect(() => {
+    const el = container.current
+    if (!el) return undefined
+    const measure = () => setTop(Math.round(el.getBoundingClientRect().top + window.scrollY))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el.parentElement)
+    window.addEventListener('resize', measure)
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
+  }, [stacked])
+
+  // Al abrir el detalle la página vuelve arriba (en móvil sustituye a la lista; en escritorio las columnas caben)
+  useEffect(() => { window.scrollTo({ top: 0 }) }, [stacked])
+
+  // Otro elemento en el detalle (rightKey): el detalle empieza arriba; la lista no se toca y conserva su scroll
+  useEffect(() => {
+    if (stacked) window.scrollTo({ top: 0 })
+    else detailPane.current?.scrollTo({ top: 0 })
+  }, [rightKey, stacked])
 
   const drawer = aside && asideDrawer ? (
     <Drawer anchor={phone ? 'bottom' : 'right'} open onClose={onAsideClose}
@@ -73,14 +99,15 @@ export default function AppSplit({ left, right, aside, layout, onLayoutChange, l
     : onLayoutChange({ asideCollapsed: !layout.asideCollapsed }))
 
   return (
-    <Box ref={container} sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
+    <Box ref={container}
+         sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, height: `calc(100dvh - ${top}px - ${BOTTOM_GAP}px)` }}>
       <Pane width={fit.left} collapsed={layout.leftCollapsed} label={leftLabel} side={SIDE.LEFT} onExpand={() => toggle(SIDE.LEFT)}>
         {left}
       </Pane>
       <Gutter side={SIDE.LEFT} label={leftLabel} width={fit.left} collapsed={layout.leftCollapsed} step={limits.step}
               onResize={(w) => resize(SIDE.LEFT, w)} onToggle={() => toggle(SIDE.LEFT)} />
       {/* En pantallas muy anchas el detalle no se estira sin límite: las líneas siguen siendo legibles */}
-      <Box sx={(t) => ({ flex: 1, minWidth: 0, maxWidth: t.layout.detailMaxWidth })}>{right}</Box>
+      <Box ref={detailPane} sx={(t) => ({ ...SCROLL_PANE, flex: 1, maxWidth: t.layout.detailMaxWidth })}>{right}</Box>
       {drawer}
       {hasAside ? (
         <>
@@ -100,8 +127,8 @@ function Pane({ width, collapsed, label, side, onExpand, children }) {
   if (collapsed) {
     return (
       <ButtonBase onClick={onExpand} aria-label={`Mostrar ${label}`} title={`Mostrar ${label}`}
-                  sx={(t) => ({
-                    width: RAIL, flexShrink: 0, alignSelf: 'flex-start', position: 'sticky', top: t.layout.sidePanelTop,
+                  sx={() => ({
+                    width: RAIL, flexShrink: 0, alignSelf: 'flex-start',
                     flexDirection: 'column', justifyContent: 'flex-start', gap: 1, py: 1.5,
                     border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper',
                     '&:hover': { borderColor: 'text.secondary' },
@@ -115,7 +142,7 @@ function Pane({ width, collapsed, label, side, onExpand, children }) {
       </ButtonBase>
     )
   }
-  return <Box sx={{ width, flexShrink: 0, minWidth: 0 }}>{children}</Box>
+  return <Box sx={{ ...SCROLL_PANE, width, flexShrink: 0 }}>{children}</Box>
 }
 
 // Separador: arrastrable con el ratón (pointer capture) y con ←/→ desde el teclado; su botón pliega la columna.
@@ -159,8 +186,8 @@ function Gutter({ side, label, width, collapsed, step, onResize, onToggle }) {
            }} />
       {collapsed ? null : (
         <IconButton size="small" onClick={onToggle} aria-label={`Plegar ${label}`} title={`Plegar ${label}`}
-                    sx={(t) => ({
-                      position: 'sticky', top: t.layout.sidePanelTop, left: 0, zIndex: 1,
+                    sx={() => ({
+                      position: 'absolute', top: 0, left: 0, zIndex: 1,
                       width: 22, height: 22, ml: '-3px', mt: 1,
                       bgcolor: 'background.paper', border: 1, borderColor: 'divider',
                       '&:hover': { bgcolor: 'surface.main', borderColor: 'text.secondary' },

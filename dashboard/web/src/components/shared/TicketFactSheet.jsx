@@ -1,8 +1,12 @@
-import { AppButton, AppCard, AppChip, AppKeyValueTable, AppStack, AppText } from '../base'
+import { AppButton, AppCard, AppChip, AppKeyValueTable, AppText } from '../base'
 import { DETAIL_TAB, MAX_ROW_TAGS } from '../../config/constants.js'
 import { chipProps } from '../../utils/chips.js'
 import { countLabel } from '../../utils/format.js'
-import { affectedValues, splitVisible } from '../../utils/tickets.js'
+import { affectedValues } from '../../utils/tickets.js'
+import { CodeTags as AllCodeTags, Tags } from './TagList.jsx'
+
+// En la ficha, pocos tags por fila: el resto en «+N»
+const CodeTags = (props) => <AllCodeTags max={MAX_ROW_TAGS} {...props} />
 
 // Ficha del ticket en tabla: una fila por dato, tags en horizontal y «Ver» para abrir el detalle en el modal.
 // Solo valores, sin explicar de dónde salen: quien la usa es analista y ya lo sabe.
@@ -38,21 +42,5 @@ export default function TicketFactSheet({ ticket: t, traceSteps, onOpen }) {
     <AppCard>
       <AppKeyValueTable rows={rows} label={`Ficha de ${t.ticket_id}`} />
     </AppCard>
-  )
-}
-
-function Tags({ children }) {
-  return <AppStack direction="row" gap={0.5} wrap>{children}</AppStack>
-}
-
-// Primeros MAX_ROW_TAGS valores como chips y el resto resumido en «+N» (con la lista completa en el tooltip)
-function CodeTags({ values = [], tone }) {
-  if (!values?.length) return <AppText tone="muted">—</AppText>
-  const { visible, hidden } = splitVisible(values, MAX_ROW_TAGS)
-  return (
-    <Tags>
-      {visible.map((v) => <AppChip key={v} label={v} variant="code" tone={tone} />)}
-      {hidden > 0 ? <AppChip label={`+${hidden}`} title={values.slice(MAX_ROW_TAGS).join(', ')} /> : null}
-    </Tags>
   )
 }
