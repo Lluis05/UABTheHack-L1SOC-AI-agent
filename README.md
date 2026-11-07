@@ -57,8 +57,10 @@ Un agente que hace el trabajo de un analista L1 de punta a punta y entrega a L2 
 ## 🧱 Stack tecnológico (propuesto)
 
 - **Lenguaje:** Python 3.11+
-- **LLM:** Claude (Anthropic API) con tool use
-- **Orquestación del agente:** tool-calling loop propio / Claude Agent SDK
+- **LLM (con fallback automático):**
+  1. **Claude Code** en modo headless (`claude -p`), sin herramientas, para resistir prompt injection
+  2. **Google Gemini** (free tier) como fallback
+- **Orquestación del agente:** pipeline propio en Python con salida estructurada (JSON Schema)
 - **Enriquecimiento:** VirusTotal, AbuseIPDB, MITRE ATT&CK (STIX)
 - **Backend:** FastAPI
 - **Frontend / Dashboard:** Streamlit o React
@@ -87,10 +89,13 @@ _Se completará durante la hackathon._
 ```bash
 git clone https://github.com/Lluis05/UABTheHack-L1SOC-AI-agent.git
 cd UABTheHack-L1SOC-AI-agent
-# pip install -r requirements.txt
-# cp .env.example .env   # añade tus API keys
-# python -m agent.main
+pip install -r requirements.txt
+cp .env.example .env        # añade GEMINI_API_KEY (fallback)
+claude                      # login en Claude Code (una sola vez)
+python -m agent.llm         # prueba rápida de la capa LLM
 ```
+
+La capa LLM (`agent/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDERS` y pasa al siguiente si uno falla (límite de uso, timeout, error).
 
 ## 🗺️ Roadmap
 
