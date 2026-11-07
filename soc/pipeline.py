@@ -11,6 +11,7 @@ CLI:
 
 Modos:
     --live    el LLM tría TODAS las alertas (el jurado quiere ver razonar a la IA); la política va como pista.
+              SIN caché de respuestas LLM: cada alerta se razona de verdad en el momento (--cache para forzarla).
     (normal)  la política cierra lo inequívoco; el LLM solo ve lo ambiguo.
     --no-llm  nada de LLM: lo no concluyente queda como "pendiente de IA".
 
@@ -130,7 +131,7 @@ def _merge_group(ticket: dict, group: list[dict]) -> dict:
 
 # ------------------------------------------------------------------ núcleo
 def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store: DataStore | None = None,
-        on_step: OnStep | None = None, dedup: bool | None = None, use_cache: bool = True,
+        on_step: OnStep | None = None, dedup: bool | None = None, use_cache: bool | None = None,
         save_traces: bool = True) -> list[dict]:
     """Tría alertas. mode: 'live' (IA en todas) | 'normal' (IA solo si hace falta) | 'no_llm'."""
     assert mode in ("live", "normal", "no_llm"), mode
@@ -147,6 +148,8 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
                     log.exception("on_step falló")
 
     dedup = (mode != "live") if dedup is None else dedup
+    # En directo nunca se reutilizan respuestas: el jurado debe ver a la IA razonar cada alerta
+    use_cache = (mode != "live") if use_cache is None else use_cache
 
     # 1-3 · contexto + política + prefiltro (determinista, ms)
     contexts, hints = [], {}
@@ -336,7 +339,10 @@ def main() -> None:
     m.add_argument("--no-llm", action="store_true", help="solo política, sin IA")
     ap.add_argument("--workers", type=int, default=5)
     ap.add_argument("--seed", type=int)
-    ap.add_argument("--no-cache", action="store_true", help="no usar la caché de respuestas LLM")
+    c = ap.add_mutually_exclusive_group()
+    c.add_argument("--cache", dest="cache", action="store_true", default=None,
+                   help="reutilizar respuestas LLM guardadas (por defecto: sí, salvo en --live)")
+    c.add_argument("--no-cache", dest="cache", action="store_false", help="no usar la caché de respuestas LLM")
     ap.add_argument("--no-dedup", action="store_true")
     ap.add_argument("--out", help="JSONL de salida (por defecto output/tickets.jsonl)")
     args = ap.parse_args()
@@ -365,10 +371,11 @@ def main() -> None:
             extra = info.get("error") or info.get("message") or ""
         print(f"  [{time.perf_counter() - t0:6.1f}s] {aid:<22} {step:<8} {extra}", flush=True)
 
-    print(f"Triando {len(alerts)} alertas en modo {mode}…")
+    cache_on = (mode != "live") if args.cache is None else args.cache
+    print(f"Triando {len(alerts)} alertas en modo {mode} (caché LLM: {'sí' if cache_on else 'no'})…")
     t0 = time.perf_counter()
     tickets = run(alerts, mode=mode, workers=args.workers, store=store, on_step=on_step,
-                  dedup=False if args.no_dedup else None, use_cache=not args.no_cache,
+                  dedup=False if args.no_dedup else None, use_cache=args.cache,
                   save_traces=not args.all)
     secs = time.perf_counter() - t0
 

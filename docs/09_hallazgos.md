@@ -12,6 +12,8 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
 | Hora | Quién | Seed | Tiempo total | Resultado | Notas |
 |---|---|---|---|---|---|
 | 14:30 | Lluis | 7 | **79 s** (sonnet, 5 workers) | 10/10 tickets con IA, 0 fallos | 6 FP, 3 TP (WAF bloqueado), 1 needs_more_info (beacon a heartbeat.bmc-agent.example) |
+| 15:00 | Lluis | 7 | 95 s, **sin caché** | 9/10 con IA, 1 ticket sin IA | Claude CLI devolvió `is_error` sin detalle y Gemini sin clave → añadido 1 reintento en `soc/llm.py` |
+| 15:10 | Lluis | 21 | **56 s, sin caché** | 10/10 con IA, 0 fallos | 7 TP (WAF bloqueado, scam sin clic), 3 FP (DocuSign, SCCM, viaje imposible falso) |
 
 ## Datos (DataStore, Lluis 13:00)
 - Las **150 alertas de la muestra están incluidas** en `alertas.jsonl`. No hay alert_id duplicados.

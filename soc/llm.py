@@ -29,7 +29,22 @@ class LLMError(RuntimeError):
     pass
 
 
+CLAUDE_RETRIES = int(os.getenv("CLAUDE_RETRIES", "1"))
+
+
 def _claude_code(system: str, prompt: str, schema: dict | None) -> str | dict:
+    """Claude Code headless. Reintenta los fallos puntuales (p. ej. JSON del esquema mal formado)."""
+    for attempt in range(CLAUDE_RETRIES + 1):
+        try:
+            return _claude_code_once(system, prompt, schema)
+        except LLMError as e:
+            if attempt == CLAUDE_RETRIES or "Timeout" in str(e) or "PATH" in str(e):
+                raise
+            log.warning("Claude Code falló (%s); reintento %d/%d", e, attempt + 1, CLAUDE_RETRIES)
+    raise AssertionError("inalcanzable")
+
+
+def _claude_code_once(system: str, prompt: str, schema: dict | None) -> str | dict:
     exe = shutil.which("claude")
     if not exe:
         raise LLMError("No se encuentra el CLI 'claude' en el PATH")
@@ -56,11 +71,16 @@ def _claude_code(system: str, prompt: str, schema: dict | None) -> str | dict:
     except json.JSONDecodeError as e:
         raise LLMError(f"Salida inválida de Claude Code: {r.stderr or r.stdout[:300]}") from e
     if out.get("is_error"):
-        raise LLMError(f"Claude Code error: {out.get('result') or out.get('api_error_status')}")
+        detail = out.get("result") or out.get("api_error_status") or out.get("subtype") or "sin detalle"
+        errs = out.get("errors")
+        raise LLMError(f"Claude Code error: {detail}{f' {errs}' if errs else ''}")
     if schema:
         if isinstance(out.get("structured_output"), dict):
             return out["structured_output"]
-        return json.loads(out["result"])
+        try:
+            return json.loads(out["result"])
+        except (TypeError, json.JSONDecodeError) as e:
+            raise LLMError(f"Claude Code no devolvió JSON válido: {str(out.get('result'))[:200]}") from e
     return out["result"]
 
 

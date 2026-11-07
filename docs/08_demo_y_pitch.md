@@ -16,6 +16,7 @@
 - [ ] API simulada levantada (`uvicorn ... --port 8000`).
 - [ ] `claude` logueado y con cuota disponible. Gemini probado.
 - [ ] Simulacro `--random 10 --live` hecho en el mismo portátil y la misma red, en menos de 2 minutos.
+- [ ] Modo live **sin caché LLM** (es el comportamiento por defecto de `--live` y del dashboard): la IA razona cada alerta en directo. No pasar `--cache`.
 - [ ] Vídeo de respaldo grabado por si falla la red.
 7. Hasta qué nivel hemos llegado y cómo lo hemos construido.
 8. **Una página para el comité de dirección de Tarvia.**

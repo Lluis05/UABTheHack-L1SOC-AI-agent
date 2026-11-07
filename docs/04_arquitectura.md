@@ -290,6 +290,7 @@ tickets = run(alerts, mode="live", workers=5, on_step=lambda alert_id, step, inf
 # pasos de on_step: context → policy → llm → reviewer → ticket (o "error"); data = {trace_entry?, ticket?, error?, message?}
 # triage_live(alerts=…, ids=…, random=N, on_step=…) = run(mode="live") + añade a output/tickets.jsonl (para el dashboard)
 ```
+- **En `live` (CLI `--live` y `triage_live`) NO se usa la caché de respuestas LLM:** el jurado ve a la IA razonar cada alerta en el momento. `--cache` la fuerza (solo para ensayos rápidos).
 - Escribe `output/tickets.jsonl` y `output/traces/<alert_id>.json` (traza + contexto completo, para el dashboard).
 - `x_mode` en cada ticket: `policy` (decidido por la política) | `llm` | `no_ai_fallback` | `pending_ai`.
 - Deduplicación (solo fuera de `live`): misma regla y mismas entidades en < 1 h → un ticket con varios `alert_ids`.
