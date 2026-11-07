@@ -138,8 +138,19 @@ Eres el camino crítico: B y C dependen de tu A3.
     se devuelve el prefiltro marcado como "sin IA". `on_step` es el callback de progreso que necesita el dashboard (C4).
 - **Terminado cuando:** con `LLM_PROVIDERS=bogus,gemini` sigue funcionando, y 10 alertas en paralelo tardan menos de 2 min.
 
-### B4 · Evaluación y afinado (17:30 → 22:00)
+### B4 · Evaluación y afinado (17:30 → 22:00) 🟡 `evaluate.py` HECHO, falta medir con las etiquetas de D
 - **Archivos:** `eval/evaluate.py`, prompts.
+- **Uso:**
+  ```bash
+  python -m eval.evaluate --run                  # tría las alertas de eval/labels_dev.jsonl (IA en todas, con caché) y evalúa
+  python -m eval.evaluate --run --mode no_llm    # línea base: solo la política (para comparar "con IA" frente a "sin IA")
+  python -m eval.evaluate --run --mode normal    # el sistema real (política + IA donde hace falta)
+  python -m eval.evaluate --tickets output/tickets.jsonl          # evalúa tickets ya generados
+  python -m eval.evaluate --policy-labels --tickets <f>           # sin etiquetas: concordancia IA ↔ política concluyente
+  python -m eval.evaluate --run --cases eval/injection_cases.jsonl   # B5: alertas con la etiqueta en "x_expected"
+  ```
+  Informe en `output/eval_report.json`. Las etiquetas aceptan `"verdict": [..]` con varias respuestas válidas
+  (p. ej. SCCM: FP o benigno) y `"injection": true` para medir la detección de inyecciones.
 - **Qué:** `evaluate.py` compara `output/tickets.jsonl` con las etiquetas de D (`eval/labels_dev.jsonl`): accuracy del
   veredicto, acierto de severidad (exacto y ±1), matriz de confusión y lista de errores.
   Iterar el prompt (por runbook si hace falta) hasta que los errores tengan explicación.

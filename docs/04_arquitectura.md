@@ -77,7 +77,7 @@ dashboard/
 eval/
   labels_dev.jsonl       # etiquetas manuales de la muestra (Persona D)
   incidents_truth.jsonl  # incidentes encontrados con threat hunting (Persona D)
-  evaluate.py            # métricas (Persona B)
+  evaluate.py            # métricas (Persona B) ✅: python -m eval.evaluate [--run] → output/eval_report.json
 docs/                    # esta documentación
 output/                  # (gitignored) resultados de ejecución
 ```
