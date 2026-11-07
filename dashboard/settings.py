@@ -40,6 +40,8 @@ DECIDER_SIMULATED = "simulated"
 # Decisiones humanas sobre el estado y a qué x_status llevan
 DECISION_CONTAINMENT = "containment"
 STATUS_BY_DECISION = {"close": STATUS_CLOSED, "escalate": STATUS_ESCALATED, "reopen": STATUS_TRIAGED}
+# Estados que la política recalcula al ejecutar acciones (no pending_ai ni lo que ya decidió una persona)
+RECOMPUTABLE_STATUSES = (STATUS_TRIAGED, STATUS_AWAITING)
 VERDICTS = ("true_positive", "benign_true_positive", "false_positive", "needs_more_info")
 
 # Pasos del triaje en vivo (docs/04, "Modo defensa en directo")

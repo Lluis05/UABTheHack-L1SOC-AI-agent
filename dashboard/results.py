@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from dashboard import settings as s
+from soc.policy.closure import status_for
 
 _write_lock = threading.Lock()
 
@@ -56,6 +57,7 @@ def _apply_ticket_decisions(ticket: dict, decisions: list[dict]) -> dict:
         return ticket
     ticket["executed_actions"] = list(ticket.get("executed_actions") or [])
     ticket["x_decided_by"] = dict(ticket.get("x_decided_by") or {})
+    status_by_human = False
     for d in decisions:
         if d.get("type") == s.DECISION_CONTAINMENT and d.get("ok"):
             ticket["executed_actions"].append(_executed_action(d))
@@ -63,12 +65,14 @@ def _apply_ticket_decisions(ticket: dict, decisions: list[dict]) -> dict:
         elif d.get("type") in s.STATUS_BY_DECISION:
             ticket["x_status"] = s.STATUS_BY_DECISION[d["type"]]
             ticket["x_decided_by"]["status"] = s.DECIDER_HUMAN
+            status_by_human = True
             if d.get("verdict"):
                 ticket["verdict"] = d["verdict"]
                 ticket["x_decided_by"]["verdict"] = s.DECIDER_HUMAN
-    if ticket.get("x_status") == s.STATUS_AWAITING and not pending_approvals(ticket):
-        escalate = (ticket.get("escalation") or {}).get("escalate")
-        ticket["x_status"] = s.STATUS_ESCALATED if escalate else s.STATUS_TRIAGED
+    if not status_by_human and ticket.get("x_status") in s.RECOMPUTABLE_STATUSES and not ticket.get("x_no_ai"):
+        # Tras ejecutar acciones, el estado lo vuelve a decidir la política (soc/policy/closure.py): p. ej. un
+        # ataque bloqueado que el runbook manda cerrar se cierra cuando el N1 ya ha bloqueado el IOC.
+        ticket["x_status"] = status_for(ticket)
     return ticket
 
 
@@ -76,13 +80,6 @@ def _executed_action(decision: dict) -> dict:
     return {"action": decision["action"], "target": decision["target"], "approved_by": decision["approver"],
             "approval_token": decision.get("approval_token"), "timestamp": decision["timestamp"],
             "result": decision.get("result")}
-
-
-def pending_approvals(ticket: dict) -> list[dict]:
-    """Acciones recomendadas que requieren aprobación y aún no se han ejecutado."""
-    done = {(e["action"], e["target"]) for e in ticket.get("executed_actions") or []}
-    return [a for a in ticket.get("recommended_actions") or []
-            if a.get("requires_approval") and (a["action"], a["target"]) not in done]
 
 
 def compute_metrics(tickets: list[dict]) -> dict:

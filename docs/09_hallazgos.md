@@ -53,6 +53,11 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
   Ojo: el cambio dice `svc_sccm`, pero la alerta muestra `SYSTEM` (lo normal en el agente SCCM). Hay que decidir si es
   aceptable y vigilar los EDR-002 con **otro padre** (Office, explorer, wscript…): esos son los sospechosos.
 - UC-EML-001: newsletters legítimas reportadas como phishing (p. ej., `news.zalando.example`).
+- (Adrián) UC-CLD-003 (50 alertas): `PutBucketPolicy` público de lectura en `tarvia-media-public` (imágenes de producto)
+  desde `CI-RUNNER01` (172.16.10.21), `terraform/1.9.5` y la cuenta `svc_ecom_deploy`. Es el «pipeline conocido» de RB-06:
+  regla `TERRAFORM_PIPELINE` → benign_true_positive. Si el cambio no viene de ese origen → `CLOUD_CHANGE_OUTSIDE_PIPELINE`.
+- (Adrián) Los `true_positive` bloqueados (WAF, AV en cuarentena) se quedaban en «triaged» aunque los runbooks dicen
+  «cerrar»: 40 de las 150 de la muestra. Ahora `soc/policy/closure.py` los cierra.
 
 ## Threat hunting de D (Marc) — la verdad del dataset ✅
 **Pista clave:** los alert_id del escenario tienen numeración **≥ 011785** (salto de 10923 a 11785). Son 138 alertas:

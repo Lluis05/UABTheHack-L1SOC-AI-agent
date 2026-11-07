@@ -2,8 +2,7 @@
 import json
 
 from dashboard import settings as s
-from dashboard.results import (ResultsStore, apply_decisions, compute_metrics, pending_approvals, percent,
-                               resolve_inside)
+from dashboard.results import ResultsStore, apply_decisions, compute_metrics, percent, resolve_inside
 
 ACTION = {"action": "revoke_sessions", "target": "u@x", "requires_approval": True, "justification": "j"}
 
@@ -28,7 +27,7 @@ def test_containment_ok_marks_action_executed_and_human():
 
 
 def test_failed_containment_is_history_only():
-    [t] = apply_decisions([make_ticket()], [containment_decision(ok=False)])
+    [t] = apply_decisions([make_ticket(escalation={"escalate": False})], [containment_decision(ok=False)])
     assert t["executed_actions"] == []
     assert t["x_status"] == s.STATUS_AWAITING
     assert len(t["x_human_decisions"]) == 1
@@ -49,9 +48,21 @@ def test_apply_decisions_does_not_mutate_input():
     assert original["x_decided_by"]["actions"] == "llm"
 
 
-def test_pending_approvals_ignores_non_approval_actions():
-    t = make_ticket(recommended_actions=[ACTION, {"action": "block_ioc", "target": "1.2.3.4", "requires_approval": False}])
-    assert pending_approvals(t) == [ACTION]
+def test_blocked_attack_closes_once_n1_executes_the_block():
+    # Runbook: TP bloqueado → bloquear IOC (N1, sin aprobación) y cerrar. Cerrado solo cuando ya está bloqueado.
+    block = {"action": "block_ioc", "target": "1.2.3.4", "requires_approval": False}
+    t = make_ticket(severity="low", x_status=s.STATUS_TRIAGED, escalation={"escalate": False}, confidence=0.9,
+                    recommended_actions=[block, {"action": "close", "target": "ticket", "requires_approval": False}])
+    d = {**containment_decision(), "action": "block_ioc", "target": "1.2.3.4", "approval_token": None}
+    assert apply_decisions([t], [])[0]["x_status"] == s.STATUS_TRIAGED
+    assert apply_decisions([t], [d])[0]["x_status"] == s.STATUS_CLOSED
+
+
+def test_human_reopen_is_not_overridden_by_policy():
+    t = make_ticket(verdict="false_positive", x_status=s.STATUS_CLOSED, escalation={"escalate": False},
+                    recommended_actions=[])
+    [r] = apply_decisions([t], [{"ticket_id": "T1", "type": "reopen", "approver": "Ana"}])
+    assert r["x_status"] == s.STATUS_TRIAGED
 
 
 def test_compute_metrics():

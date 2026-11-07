@@ -9,7 +9,8 @@ from __future__ import annotations
 
 API_ACTIONS = {"isolate_host", "disable_user", "revoke_sessions", "reset_password", "block_ioc",
                "purge_email", "disable_access_key"}
-NON_API_ACTIONS = {"close", "escalate", "monitor", "notify"}
+# full_scan y propose_rule_exclusion: acciones de cierre de los runbooks (RB-02, RB-09, RB-10), sin API
+NON_API_ACTIONS = {"close", "escalate", "monitor", "notify", "full_scan", "propose_rule_exclusion"}
 DUAL_USE = ("mega.nz", "mega.io", "anydesk", "teamviewer", "wetransfer", "dropbox", "drive.google",
             "onedrive", "github.com")
 

@@ -36,6 +36,7 @@ TITLES = {
     "KNOWN_SERVICE_BEACON": "Telemetría periódica legítima desde {host}",
     "VELA_CONVERSATIONAL_CORRECTION": "Cliente corrigiendo su propia petición a Vela (no es prompt injection)",
     "KNOWN_PACKAGE_POSTINSTALL": "Script postinstall estándar de un paquete público conocido en CI",
+    "TERRAFORM_PIPELINE": "Cambio en un bucket aplicado por el pipeline de Terraform conocido",
     "WAF_BLOCKED": "Ataque web oportunista contra la tienda bloqueado por el WAF ({ip})",
     "AV_BLOCKED": "Malware/PUA bloqueado por el antivirus en {host} antes de ejecutarse",
     "PROMPT_INJECTION_TEXT": "Intento de manipular el triaje con instrucciones ocultas ({rule_name})",
@@ -81,6 +82,25 @@ def _main_hit(hits: list[dict], because: list[str]) -> dict | None:
     return next((h for h in deciding if h["rule"] in TITLES), deciding[0] if deciding else None)
 
 
+# Acciones que los runbooks piden al cerrar, además de «close»
+EXCLUSION_HITS = {"NESSUS_SCAN", "KNOWN_SERVICE_BEACON", "CDN_RANDOM_SUBDOMAIN", "KNOWN_PACKAGE_POSTINSTALL"}  # RB-09, RB-10
+FULL_SCAN_HITS = {"AV_BLOCKED"}  # RB-02: «cerrar con escaneo completo»
+
+
+def closing_actions(hits: list[dict], actions: list[dict], host: str, rule_id: str) -> list[dict]:
+    """Acciones de cierre de los runbooks (solo si el ticket se va a cerrar)."""
+    if not any(a["action"] == "close" for a in actions):
+        return []
+    names = {h["rule"] for h in hits}
+    out = []
+    if names & FULL_SCAN_HITS:
+        out.append({"action": "full_scan", "target": host, "justification": "RB-02: escaneo completo antes de cerrar"})
+    if names & EXCLUSION_HITS:
+        out.append({"action": "propose_rule_exclusion", "target": rule_id or "regla",
+                    "justification": "RB-09/RB-10: actividad conocida, proponer exclusión en la regla"})
+    return out
+
+
 def prefilter(ctx: dict) -> dict | None:
     """Pista determinista (formato compatible con soc.triage.agent: verdict, title, summary, ...)."""
     hits = ctx.get("policy_hits") or []
@@ -124,6 +144,7 @@ def prefilter(ctx: dict) -> dict | None:
         actions = [{"action": "close", "target": "ticket", "justification": "Bloqueado por un control, sin impacto"}]
     else:
         actions = [{"action": "monitor", "target": vals["host"], "justification": "Vigilar 24 h la entidad afectada"}]
+    actions += closing_actions(hits, actions, vals["host"], alert.get("rule_id") or "")
     for i in ctx.get("intel") or []:
         if sug["verdict"] == "true_positive" and (i.get("tip") or {}).get("reputation") == "malicious":
             actions.append({"action": "block_ioc", "target": i["indicator"],

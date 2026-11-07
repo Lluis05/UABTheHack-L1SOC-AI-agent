@@ -31,6 +31,11 @@ PAYROLL_DEST = "asesoria@gestoria-pons.example"
 TRUSTED_SIGNERS = ("sap se", "microsoft", "adobe", "google", "oracle", "cisco", "zoom")
 SUSPICIOUS_CHILDREN = ("powershell", "cmd.exe", "wscript", "cscript", "mshta", "rundll32", "regsvr32",
                        "certutil", "bitsadmin", "curl", "wget")
+# Pipeline de despliegue de la tienda (RB-06 «pipeline conocido»): runner de CI de la CMDB, Terraform y la
+# cuenta de despliegue. Solo cubre la política pública del bucket de imágenes de producto (UC-CLD-003).
+CI_RUNNER_IP = "172.16.10.21"  # CI-RUNNER01 en activos.csv
+CI_DEPLOY_IDENTITY = "svc_ecom_deploy"
+TERRAFORM_UA = "terraform/"
 KNOWN_CDN_PARENTS = ("akamaized.net", "blob.core.windows.net", "cloudfront.net", "amazonaws.com",
                      "googleapis.com", "azureedge.net", "fastly.net", "gstatic.com", "windows.net")
 
@@ -297,6 +302,27 @@ def r_payroll(ctx, store):
         return [hit("PAYROLL_FLOW", "benign", "Envío de variables de nómina a la gestoría Pons: flujo aprobado con "
                     "contrato de encargado de tratamiento vigente", "FLUJO-0007", "benign_true_positive")]
     return []
+
+
+def _from_deploy_pipeline(event: dict) -> bool:
+    ident = event.get("userIdentity") if isinstance(event.get("userIdentity"), dict) else {}
+    return (event.get("sourceIPAddress") == CI_RUNNER_IP and str(event.get("userAgent", "")).startswith(TERRAFORM_UA)
+            and ident.get("userName") == CI_DEPLOY_IDENTITY)
+
+
+def r_terraform_pipeline(ctx, store):
+    if _rule(ctx) != "UC-CLD-003":
+        return []
+    calls = [e for e in ctx.get("related_events") or [] if e.get("_source") == "cloudtrail"]
+    if not calls:
+        return []
+    if all(_from_deploy_pipeline(e) for e in calls):
+        bucket = ((calls[0].get("requestParameters") or {}).get("bucketName")) or "?"
+        return [hit("TERRAFORM_PIPELINE", "benign", f"Cambio en {bucket} aplicado por Terraform desde CI-RUNNER01 "
+                    f"({CI_RUNNER_IP}) con la cuenta de despliegue {CI_DEPLOY_IDENTITY}: pipeline conocido",
+                    "RB-06", "benign_true_positive")]
+    return [hit("CLOUD_CHANGE_OUTSIDE_PIPELINE", "suspicious", "El cambio en el bucket NO viene del pipeline de "
+                "Terraform de CI-RUNNER01", "RB-06")]
 
 
 # ---------------------------------------------------------- reglas internas
@@ -582,7 +608,8 @@ def _valid_ip(v: str) -> bool:
 
 RULES: list[Callable] = [
     r_pentest, r_nessus, r_sccm, r_psexec_deploy, r_ot, r_logisoft, r_ad_groups, r_edr_tamper, r_payroll,
-    r_adm_outside_jump, r_anydesk, r_svc_backup, r_supply_chain, r_hr, r_intel, r_known_patterns,
+    r_terraform_pipeline, r_adm_outside_jump, r_anydesk,
+    r_svc_backup, r_supply_chain, r_hr, r_intel, r_known_patterns,
     r_prompt_injection,
 ]
 

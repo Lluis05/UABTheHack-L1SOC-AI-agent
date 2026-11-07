@@ -35,6 +35,7 @@ from typing import Any, Callable
 
 from soc import config
 from soc.llm import LLMError, complete
+from soc.policy.closure import LLM_CLOSE_MIN_CONFIDENCE, STATUS_CLOSED, mandatory_escalation, status_for
 
 log = logging.getLogger(__name__)
 
@@ -324,16 +325,6 @@ def _affected(ctx: dict) -> dict:
     }
 
 
-def _status(verdict: str, escalate: bool, actions: list[dict]) -> str:
-    if escalate:
-        return "escalated"
-    if any(a["requires_approval"] for a in actions):
-        return "awaiting_approval"
-    if verdict in ("false_positive", "benign_true_positive"):
-        return "closed"
-    return "triaged"
-
-
 def assemble_ticket(ctx: dict, llm: dict, provider: str | None, *, cached: bool = False,
                     decided_by_verdict: str = "llm", t_start: float | None = None, store: Any = None) -> dict:
     """Combina la salida del LLM con las decisiones del código → Ticket (contrato docs/04)."""
@@ -358,6 +349,8 @@ def assemble_ticket(ctx: dict, llm: dict, provider: str | None, *, cached: bool 
         reasons.append(llm.get("escalation_reason") or "Propuesto por el agente")
     if verdict == "true_positive" and sev["final"] in ("high", "critical"):
         reasons.append(f"Obligatorio: true_positive de severidad {sev['final']} (política §5)")
+    # §5: ejecución, credenciales, persistencia, datos personales o fraude escalan aunque la severidad sea baja
+    reasons += mandatory_escalation(verdict, ctx.get("policy_hits") or [], alert.get("rule_id") or "")
     if llm.get("injection_detected"):
         reasons.append("Intento de manipulación del analista/IA en los datos")
     escalate = bool(reasons)
@@ -409,7 +402,12 @@ def assemble_ticket(ctx: dict, llm: dict, provider: str | None, *, cached: bool 
         "x_notes": action_notes,
     }
     ticket = validate_evidence(ticket, ctx)
-    ticket["x_status"] = _status(ticket["verdict"], escalate, actions)
+    ticket["x_status"] = status_for(ticket)
+    sure = {**ticket, "confidence": 1.0}
+    if ticket["x_status"] != STATUS_CLOSED and status_for(sure) == STATUS_CLOSED:
+        # La IA recomienda cerrar pero con poca confianza: lo confirma la persona
+        ticket["open_questions"].append(f"Confianza {ticket['confidence']:.2f} < {LLM_CLOSE_MIN_CONFIDENCE}: "
+                                        "la IA recomienda cerrar, confírmalo antes")
     return ticket
 
 

@@ -56,6 +56,7 @@ soc/
   policy/
     severity.py          # matriz + ajustes (Persona A)
     rules.py             # cambios aprobados + reglas internas Tarvia -> PolicyHit (Persona A)
+    closure.py           # cuándo se cierra (runbooks) y escalado obligatorio (§5) -> x_status
   triage/
     prefilter.py         # decisiones deterministas (Persona A/B)
     agent.py             # prompt + llamada LLM + validación -> Ticket (Persona B)
@@ -196,6 +197,20 @@ patrones conocidos de FP/TP por regla del SIEM y **PROMPT_INJECTION_TEXT**.
 `approval_for(action, target, store)` → `{"allowed", "requires_approval", "approvers": ["N2", ...], "note"}`.
 `block_ioc` y `purge_email` no requieren aprobación (salvo servicios de uso dual). Los servidores necesitan N2 + responsable del
 servicio, y los TPV o frontales N2 + Negocio. Sobre OT `allowed=false`.
+`full_scan` y `propose_rule_exclusion` son acciones de cierre de los runbooks (RB-02, RB-09, RB-10): sin API ni aprobación.
+
+### Cierre y escalado — `soc/policy/closure.py`
+- `mandatory_escalation(verdict, hits, rule_id)` → motivos de **escalado obligatorio §5** para un `true_positive`, sin
+  depender de la severidad: ejecución confirmada, robo de credenciales, persistencia, datos personales que han podido salir
+  (no si un control lo bloqueó) y fraude. Se suman al escalado por `true_positive` high/critical.
+- `ticket_status(verdict, severity, escalate, actions, confidence, decided_by)` → `x_status`, por orden:
+  `escalated` › `awaiting_approval` (alguna acción necesita aprobación) › `triaged` si lo decide el LLM con confianza
+  < `LLM_CLOSE_MIN_CONFIDENCE` (0.7; criterio propio, Deloitte no fija umbral) › `closed` si es FP/benigno, o si es un
+  `true_positive` low/informational con acción `close` (runbooks: bloqueado o sin interacción → cerrar) › `triaged`.
+- **Nunca se cierra con acciones de la API sin ejecutar.** El sistema no ejecuta contención (Deloitte: «siempre con
+  aprobación humana»), así que si el runbook manda «bloquear IOC y cerrar» el ticket queda `triaged` hasta que el N1
+  pulsa «Ejecutar»; entonces el dashboard recalcula con `status_for(ticket)` y lo cierra. Una decisión humana de estado
+  (cerrar, escalar, reabrir) siempre manda sobre el recálculo.
 
 ### Ticket — salida de triaje (`output/tickets.jsonl`, una línea por ticket)
 El esquema de Deloitte (`ticket_salida.schema.json`) **más** campos propios con prefijo `x_`:
