@@ -52,7 +52,7 @@ Detalle completo y contratos entre módulos en [`docs/04_arquitectura.md`](docs/
 | **1 · Triaje básico** | ✅ | Ticket por alerta con el esquema oficial (`ticket_salida.schema.json`): veredicto, confianza, severidad razonada, evidencias con `event_id`, enriquecimiento, MITRE, acciones, escalado y preguntas abiertas. |
 | **2 · Triaje con criterio** | ✅ | Matriz de severidad con la criticidad real del activo, descarte argumentado de lo autorizado (SCCM, pentest, Nessus, Terraform, flujos de nóminas…), deduplicación y correlación en incidentes. |
 | **3 · Investigación** | ✅ | Reconstrucción de la cadena de ataque entre días e informe para N2 con el esquema `informe_incidente.schema.json` (`soc/correlate/investigate.py`): paciente cero, acceso inicial, cronología con `event_id` validados, alcance, causa raíz, plan de contención con sus aprobadores, erradicación, notificaciones y huecos de detección. En el dashboard: **Incidentes → Informe N2**, con un botón para generarlo (≈30-70 s) y descargarlo en JSON. Ejemplo: [`docs/anexos/informe_INC-0004.json`](docs/anexos/informe_INC-0004.json). |
-| **4 · Respuesta** | ✅ | Acciones de contención propuestas con su aprobador según la política; se ejecutan contra la API simulada solo tras la aprobación humana (`approval_token`) y quedan en el registro. |
+| **4 · Respuesta** | ✅ | Acciones de contención propuestas con su aprobador según la política (también cuando decide la política sola: las de los runbooks, como aislar el equipo, revocar sesiones o desactivar claves cloud); se ejecutan contra la API simulada solo tras la aprobación humana (`approval_token`) y quedan en el registro. |
 
 ## 📊 Resultados medidos
 
@@ -70,7 +70,11 @@ Detalle completo y contratos entre módulos en [`docs/04_arquitectura.md`](docs/
   con todas sus alertas, incluidos los de varias fases sin entidades en común (Logisoft 18/18 y tienda T07 5/5).
 - **OSINT** (opcional): con las listas públicas ya cargadas añade unos milisegundos por alerta; en el simulacro encontró
   la IP de la VPN de Logisoft y la del C2 del minero de Jenkins en 8 listas negras de IPsum.
-- **Tests:** 184 tests en Python (`pytest`) y tests del frontend (`vitest`). Ningún test puede gastar cuota del LLM.
+- **Las 10 alertas de la defensa** (`demo_alertas_comunes.jsonl`, triadas desde el dashboard sin caché): 6 verdaderos
+  positivos, todos escalados a N2, y 4 cerradas como benignas con su justificación. La política decide 7 en milisegundos
+  y la IA 3 (unos 30-55 s cada una, con revisor en las graves). Informe completo en
+  [`informe_triaje_10_alertas.pdf`](informe_triaje_10_alertas.pdf).
+- **Tests:** 204 tests en Python (`pytest`) y tests del frontend (`vitest`). Ningún test puede gastar cuota del LLM.
 
 ## 🔒 Seguridad por diseño
 
@@ -135,9 +139,13 @@ Si no está levantada, el sistema lee del dataset local y lo avisa.
 cd dashboard/web && npm install && npm run build && cd ../..
 uvicorn dashboard.server:app --port 8001      # http://localhost:8001
 ```
-Desde el dashboard se puede triar en directo: subir o pegar el JSON de alertas (cualquier formato), o elegir IDs.
-Por defecto tría en modo `normal` (la política cierra lo inequívoco y la IA ve lo ambiguo); con `TRIAGE_MODE=live`
-la IA analiza todas las alertas.
+Desde el dashboard se puede triar en directo: arrastrar o elegir el fichero de alertas, pegar el JSON (cualquier
+formato) o elegir IDs. Por defecto tría en modo `normal` (la política cierra lo inequívoco y la IA ve lo ambiguo); con
+`TRIAGE_MODE=live` la IA analiza todas las alertas. Desde el dashboard **nunca se reutiliza la caché del LLM** (ni en el
+triaje ni en el informe N2): la IA razona en directo.
+
+Para dejar la cola vacía: vaciar `output/tickets.jsonl` (no borrarlo: sin él se muestran los tickets de ejemplo) y
+reiniciar el dashboard. Los informes N2 están en `output/reports/<incident_id>.json`.
 
 **3. CLI:**
 ```bash
@@ -149,7 +157,8 @@ python -m soc.pipeline --all --no-llm                    # todo el dataset solo 
 ```
 Salida: `output/tickets.jsonl`, `output/traces/<alert_id>.json` y `output/incidents.jsonl`.
 
-**4. Presentación de la defensa** (3 minutos, el pipeline paso a paso con casos reales):
+**4. Presentación de la defensa** (3 minutos, el pipeline paso a paso sobre el caso real del vídeo de la demo: el
+cambio de IBAN tras AiTM, `ALR-20261008-011789`):
 ```bash
 cd presentacio && npm install && npm run build   # dist/index.html: un único fichero, se abre sin servidor ni red
 ```
@@ -161,6 +170,14 @@ pytest                                  # backend
 cd dashboard/web && npm test            # frontend
 cd presentacio && npm test              # lógica de la presentación
 ```
+
+## 📦 Entregables
+
+- [`informe_triaje_10_alertas.pdf`](informe_triaje_10_alertas.pdf): informe de las 10 alertas de la defensa. Para cada
+  una, por qué saltó, qué se investigó paso a paso, el enrichment, las reglas de la política y la severidad, el
+  análisis de la IA y del revisor, las evidencias con `event_id`, las acciones con sus aprobadores y el escalado.
+- [`enlace_drive.txt`](enlace_drive.txt): enlace a Google Drive.
+- Página para el comité de dirección: [`docs/13_comite_direccion.md`](docs/13_comite_direccion.md).
 
 ## 📁 Estructura del proyecto
 
