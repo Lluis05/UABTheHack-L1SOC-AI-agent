@@ -1,79 +1,148 @@
-# 🛡️ L1 SOC AI Agent — UAB The Hack × Deloitte
+# 🛡️ Tarvia · L1 SOC AI Agent — UAB The Hack × Deloitte
 
-> Agente de IA autónomo que realiza el **triage de nivel 1 (L1)** de alertas de seguridad: las recibe, las enriquece, las correlaciona, decide un veredicto razonado y propone (o ejecuta con aprobación) la respuesta. Inspirado en los enfoques *AIR (Automated Investigation & Response)* y *Triage Agents* de los SOC modernos.
+> Sistema que hace el **triaje de nivel 1** del SOC de Tarvia Group: recibe cada alerta, la investiga con los datos
+> del SOC (CMDB, directorio, TIP, logs, cambios), aplica la política de la empresa y deja al analista una conclusión
+> lista para decidir. **La IA investiga, la política decide la severidad y la persona aprueba la contención.**
 
 ---
 
 ## 🎯 El problema
 
-Los analistas L1 de un SOC reciben cientos o miles de alertas al día. La mayoría son **falsos positivos** o ruido, y el tiempo dedicado a revisarlas una a una provoca:
+El SOC de Tarvia recibe unas **4.000 alertas al día** con 3 analistas N1 que trabajan de 8 a 20 h. Triar una alerta
+a mano lleva unos **15 minutos** (SIEM → CMDB → directorio → VirusTotal → logs → ticket), y la mayoría son ruido:
+falsos positivos, reglas mal afinadas y actividad autorizada que parece un ataque. De noche y en fin de semana nadie
+mira la consola.
 
-- **Alert fatigue** y alertas críticas que se pasan por alto.
-- **MTTR** (tiempo medio de respuesta) elevado.
-- Criterios de triage inconsistentes entre analistas.
+## 💡 Nuestra solución: híbrido determinista + IA
 
-## 💡 Nuestra solución
+No pasamos 11.061 alertas por un LLM. **Lo que la política define con exactitud lo hace el código**; **el LLM se usa
+donde hace falta criterio**. Cada campo del ticket indica quién lo decidió (`policy`, `llm` o `human`).
 
-Un agente que hace el trabajo de un analista L1 de punta a punta y entrega a L2 solo lo que importa, **con la investigación ya hecha y explicada**.
+| Quién | Qué decide |
+|---|---|
+| **Código determinista** (`soc/policy`) | Severidad con la matriz de la política (severidad de la regla × criticidad del activo, ajustes de ±1 nivel), cambios aprobados, ventanas de pentest, reglas internas de Tarvia, qué acciones necesitan aprobación y de quién. |
+| **IA** (`soc/triage`) | Veredicto en los casos ambiguos, interpretación de la evidencia, resumen para N2, mapeo MITRE y acciones propuestas. Puede proponer un ajuste de severidad justificado, que el código valida. |
+| **Persona** (dashboard) | Aprueba o rechaza la contención, revisa lo escalado y puede reabrir o cambiar un veredicto. **La IA nunca tiene acceso a la contención.** |
 
 ```
- Alertas (repo GitHub de Deloitte)
+ Alertas (API simulada del SOC / JSON de la defensa)
         │
         ▼
- ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
- │  1. Ingesta  │──▶│ 2. Enrich.   │──▶│ 3. Triage    │──▶│ 4. Revisión  │
- │ normalizar   │   │ IOCs, intel, │   │ veredicto +  │   │ agente crítico│
- │ deduplicar   │   │ contexto     │   │ MITRE ATT&CK │   │ (anti-alucin.)│
- └──────────────┘   └──────────────┘   └──────────────┘   └──────┬───────┘
-                                                                  ▼
-                         ┌──────────────────────────────────────────────┐
-                         │ 5. Salida: TP / FP / Benigno / Escalar a L2   │
-                         │    informe, acciones propuestas, dashboard    │
-                         └──────────────────────────────────────────────┘
+ 1. Normalización ─▶ 2. Contexto ─────────▶ 3. Política ──────────▶ 4. Prefiltro
+    entrada robusta    CMDB, usuario+RRHH,     matriz de severidad,     ¿decisión clara?
+    (cualquier JSON)   TIP, GeoIP, sandbox,    cambios aprobados,        │ sí → ticket (policy)
+                       logs ±24 h, alertas     reglas de Tarvia,         │ no
+                       de las mismas           detección de inyección    ▼
+                       entidades                                    5. Agente LLM + revisor
+                                                                       veredicto con evidencia citada
+        ┌──────────────────────────────────────────────────────────────┘
+        ▼
+ 6. Correlación ─▶ incidentes multi-alerta (grafo de entidades, días o semanas)
+        ▼
+ 7. Dashboard ─▶ cola, traza de consultas, evidencias, chat del ticket
+                 └─▶ aprobación humana ─▶ POST /approvals ─▶ POST /containment (API simulada)
 ```
 
-### Flujo de triage
+Detalle completo y contratos entre módulos en [`docs/04_arquitectura.md`](docs/04_arquitectura.md).
 
-1. **Ingesta y normalización** — lectura de las alertas del repositorio proporcionado por Deloitte y conversión a un esquema común (inspirado en OCSF/ECS).
-2. **Enriquecimiento** — extracción de IOCs (IPs, dominios, hashes, usuarios, hosts) y consulta a fuentes de threat intelligence y contexto interno.
-3. **Correlación** — agrupación de alertas relacionadas en **incidentes** (mismo host, usuario, IOC o ventana temporal) para no tratar cada alerta de forma aislada.
-4. **Triage con LLM** — clasificación (*True Positive / False Positive / Benign / Needs escalation*), severidad, **mapeo a MITRE ATT&CK** y razonamiento paso a paso.
-5. **Agente revisor** — un segundo agente cuestiona el veredicto y verifica que cada afirmación esté respaldada por evidencia de la alerta.
-6. **Respuesta** — informe para L2 y acciones de contención recomendadas (aislar host, bloquear IP, resetear credenciales…) con **human-in-the-loop**.
+## 🧗 Hasta dónde hemos llegado (niveles del reto)
 
-## 🏆 Qué nos diferencia
+| Nivel | Estado | Qué hace |
+|---|---|---|
+| **1 · Triaje básico** | ✅ | Ticket por alerta con el esquema oficial (`ticket_salida.schema.json`): veredicto, confianza, severidad razonada, evidencias con `event_id`, enriquecimiento, MITRE, acciones, escalado y preguntas abiertas. |
+| **2 · Triaje con criterio** | ✅ | Matriz de severidad con la criticidad real del activo, descarte argumentado de lo autorizado (SCCM, pentest, Nessus, Terraform, flujos de nóminas…), deduplicación y correlación en incidentes. |
+| **3 · Investigación** | 🟡 | Reconstrucción de la cadena de ataque entre días, e informe con el esquema `informe_incidente.schema.json` (`soc/correlate/investigate.py`). Hay un informe generado de ejemplo ([`docs/anexos/informe_INC-0004.json`](docs/anexos/informe_INC-0004.json)); el dashboard muestra los incidentes, pero todavía no el informe completo. |
+| **4 · Respuesta** | ✅ | Acciones de contención propuestas con su aprobador según la política; se ejecutan contra la API simulada solo tras la aprobación humana (`approval_token`) y quedan en el registro. |
 
-| Diferenciador | Por qué importa |
-|---|---|
-| **Veredictos explicables con cadena de evidencia** | Cada decisión cita los campos concretos de la alerta y del enriquecimiento que la justifican. Nada de cajas negras. |
-| **Puntuación de confianza calibrada** | Si la confianza es baja, el agente escala en lugar de adivinar. |
-| **Arquitectura multi-agente con revisor crítico** | Reduce alucinaciones y falsos negativos. |
-| **Defensa contra prompt injection** | Las alertas contienen datos controlados por el atacante (command lines, asuntos de email, user-agents). Los aislamos y sanitizamos antes de pasarlos al LLM. |
-| **Correlación alerta → incidente** | El agente ve la historia completa del ataque, no piezas sueltas. |
-| **Aprendizaje del feedback del analista** | Las correcciones de L2 se guardan y se usan como ejemplos en futuros triajes. |
-| **Métricas medibles** | Benchmark de precisión/recall frente al ground truth y tiempo ahorrado por alerta. |
-| **Dashboard en tiempo real** | Visualización de la cola de alertas, veredictos, mapa MITRE e incidentes. |
-| **Chat IA dentro de cada ticket** | El analista pregunta en lenguaje natural (Gemini) por qué se cerró o escaló un ticket, qué reglas de la política aplicaron, cómo se calculó la severidad o en qué evidencias se basa. Solo consulta: no puede ejecutar acciones. Ver [`docs/12_chatbot.md`](docs/12_chatbot.md). |
+## 📊 Resultados medidos
 
-## 🧱 Stack tecnológico (propuesto)
+- **Todo el dataset sin IA** (`--all --no-llm`): la política decide sola **9.538 de 10.972 tickets (87 %)**; los 1.434
+  restantes quedan pendientes de IA. Ninguno se cierra en silencio: los pendientes high/critical se escalan a una persona.
+- **Prompt injection:** **6/6** inyecciones detectadas y **0** veredictos cambiados, con 0 falsas detecciones en el
+  control. Incluye un caso real del dataset (`ALR-20261020-011905`, factura falsa con texto oculto que pide marcarla como
+  false_positive).
+- **Correlación:** encuentra los **12/12** incidentes de nuestra verdad de threat hunting (`eval/incidents_truth.jsonl`).
+- **Tests:** 159 tests en Python (`pytest`) y tests del frontend (`vitest`). Ningún test puede gastar cuota del LLM.
 
-- **Lenguaje:** Python 3.11+
-- **LLM (con fallback automático):**
-  1. **Claude Code** en modo headless (`claude -p`), sin herramientas, para resistir prompt injection
-  2. **Google Gemini** (free tier) como fallback
-- **Orquestación del agente:** pipeline propio en Python con salida estructurada (JSON Schema)
-- **Enriquecimiento:** VirusTotal, AbuseIPDB, MITRE ATT&CK (STIX)
-- **API del SOC:** mock_soc_api (FastAPI) proporcionada por Deloitte
-- **Dashboard:** React + Vite (frontend) y FastAPI (backend en `dashboard/server.py`)
-- **Datos:** índices en memoria sobre el dataset de Deloitte + API simulada para contención
+## 🔒 Seguridad por diseño
 
-> Detalles en [docs/04_arquitectura.md](docs/04_arquitectura.md).
+- **Datos no confiables:** todo lo que viene de alertas y logs (asuntos, prompts, command lines…) va dentro de
+  `<untrusted_data>` y se trata como dato, nunca como instrucción. La política detecta los intentos de inyección.
+- **El LLM no tiene herramientas** (`claude -p` sin tools) ni acceso a los endpoints de contención.
+- **Indicadores reales del dataset:** no se visitan, no se descargan ni se escanean.
 
-## 📚 Documentación
+## ⚠️ Lo que no resolvemos
 
-Toda la documentación del equipo está en [`docs/`](docs/00_INDICE.md): el reto, el dataset, la política del SOC,
-la arquitectura y los contratos, el reparto, el setup, la capa LLM y la demo.
-Para trabajar con Claude Code, ver [`CLAUDE.md`](CLAUDE.md).
+Resumen; la lista completa, con datos, está en [`docs/08_demo_y_pitch.md`](docs/08_demo_y_pitch.md#lo-que-no-resolvemos-rellenar-con-honestidad-durante-la-noche).
+
+- **Sin IA, la política deja 49 de 83 alertas de ataque pendientes** (credential stuffing, túnel DNS, AiTM, fuga de
+  datos…): necesitan el LLM o una persona.
+- **Gemini gratis no aguanta la defensa si Claude se cae** (5 peticiones/min). Las alertas sin IA salen marcadas
+  `[SIN IA]` con la decisión de la política.
+- **La correlación parte dos incidentes en piezas** cuando las fases no comparten ninguna entidad (Logisoft y la
+  tienda T07). Un analista las une; el código no. Genera además 1 incidente falso de 14.
+- **Sin OSINT externo:** el enriquecimiento usa el TIP interno, GeoIP y el sandbox de la API; no consultamos
+  VirusTotal ni AbuseIPDB.
+- **Listas fijas** de servicios legítimos e infraestructura conocida, que en otra empresa habría que mantener.
+- **Las etiquetas de evaluación son nuestras:** la verdad la ha construido el equipo con threat hunting.
+
+## 🧱 Stack
+
+- **Python 3.11+**, pipeline propio con salida estructurada (JSON Schema).
+- **LLM con fallback automático:** Claude Code headless (`claude -p`) → Google Gemini (free tier). Orden en `LLM_PROVIDERS`.
+- **API del SOC:** `mock_soc_api` (FastAPI) de Deloitte, para leer alertas, enriquecer y ejecutar la contención.
+- **Datos:** índices en memoria sobre el dataset, cargados una sola vez (contexto en < 1 s por alerta).
+- **Dashboard:** React + Vite + Material UI (frontend) y FastAPI (`dashboard/server.py`). Chat del ticket con Gemini,
+  solo de consulta ([`docs/12_chatbot.md`](docs/12_chatbot.md)).
+
+## 🚀 Puesta en marcha
+
+Requisitos: Python 3.11+, Node.js, el CLI de Claude Code con sesión iniciada y el repo de Deloitte
+([`dttdfr/DTT-UAB-The-Hack`](https://github.com/dttdfr/DTT-UAB-The-Hack)) clonado **en la misma carpeta padre**.
+El dataset no se copia a este repo.
+
+```bash
+git clone https://github.com/Lluis05/UABTheHack-L1SOC-AI-agent.git
+cd UABTheHack-L1SOC-AI-agent
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env        # DATASET_DIR y GEMINI_API_KEY (fallback y chat)
+claude                      # login en Claude Code (una sola vez)
+python -m soc.llm           # prueba rápida de la capa LLM
+```
+
+**1. API simulada del SOC** (en el repo de Deloitte):
+```bash
+cd ../DTT-UAB-The-Hack/06_herramientas
+pip install -r requirements.txt
+uvicorn mock_soc_api:app --port 8000          # http://localhost:8000/docs
+```
+Si no está levantada, el sistema lee del dataset local y lo avisa.
+
+**2. Dashboard:**
+```bash
+cd dashboard/web && npm install && npm run build && cd ../..
+uvicorn dashboard.server:app --port 8001      # http://localhost:8001
+```
+Desde el dashboard se puede triar en directo: subir o pegar el JSON de alertas (cualquier formato), o elegir IDs.
+Por defecto tría en modo `normal` (la política cierra lo inequívoco y la IA ve lo ambiguo); con `TRIAGE_MODE=live`
+la IA analiza todas las alertas.
+
+**3. CLI:**
+```bash
+python -m soc.pipeline --file defensa.json --live        # alertas nuevas (p. ej. las de la defensa)
+python -m soc.pipeline --ids ALR-...,ALR-... --live      # alertas concretas
+python -m soc.pipeline --random 10 --live                # simulacro de la defensa, cronometrado
+python -m soc.pipeline --sample                          # las 150 alertas de desarrollo
+python -m soc.pipeline --all --no-llm                    # todo el dataset solo con la política (métricas)
+```
+Salida: `output/tickets.jsonl`, `output/traces/<alert_id>.json` y `output/incidents.jsonl`.
+
+**4. Tests** (no gastan cuota del LLM):
+```bash
+pytest                                  # backend
+cd dashboard/web && npm test            # frontend
+```
 
 ## 📁 Estructura del proyecto
 
@@ -81,43 +150,23 @@ Para trabajar con Claude Code, ver [`CLAUDE.md`](CLAUDE.md).
 .
 ├── soc/
 │   ├── llm.py          # Capa LLM: Claude Code → Gemini (fallback)
-│   ├── data/           # Carga e indexado del dataset
-│   ├── enrich/         # Contexto: CMDB, usuarios, TIP, GeoIP, sandbox, logs ±24h
-│   ├── policy/         # Matriz de severidad, cambios aprobados, reglas de Tarvia
+│   ├── data/           # Carga e indexado del dataset, cliente de la API y normalización de la entrada
+│   ├── enrich/         # Contexto: CMDB, usuarios, TIP, GeoIP, sandbox, logs ±24 h
+│   ├── policy/         # Matriz de severidad, cambios aprobados, reglas de Tarvia, aprobaciones, cierre
 │   ├── triage/         # Prefiltro determinista, agente LLM, revisor
-│   ├── correlate/      # Agrupación en incidentes y cadena de ataque
+│   ├── correlate/      # Incidentes multi-alerta e informe de investigación
 │   └── pipeline.py     # Orquestación y CLI
-├── dashboard/          # React + FastAPI: cola, traza, evidencias, aprobación humana, triaje en vivo, chat IA del ticket
-├── eval/               # Etiquetas manuales y métricas
+├── dashboard/          # React + FastAPI: cola, traza, evidencias, aprobación humana, triaje en vivo, chat del ticket
+├── eval/               # Etiquetas del equipo, verdad de incidentes, casos de inyección y evaluación
+├── tests/              # pytest
 └── docs/               # Documentación del equipo
 ```
 
-## 🚀 Puesta en marcha
+## 📚 Documentación
 
-_Se completará durante la hackathon._
-
-```bash
-git clone https://github.com/Lluis05/UABTheHack-L1SOC-AI-agent.git
-cd UABTheHack-L1SOC-AI-agent
-pip install -r requirements.txt
-cp .env.example .env        # añade GEMINI_API_KEY (fallback)
-claude                      # login en Claude Code (una sola vez)
-python -m soc.llm          # prueba rápida de la capa LLM
-```
-
-La capa LLM (`soc/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDERS` y pasa al siguiente si uno falla (límite de uso, timeout, error).
-
-## 🗺️ Roadmap
-
-- [ ] Analizar el formato de las alertas de Deloitte
-- [ ] Ingesta y normalización
-- [ ] Extracción de IOCs y enriquecimiento
-- [ ] Agente de triage con salida estructurada y mapeo MITRE
-- [ ] Agente revisor
-- [ ] Correlación en incidentes
-- [ ] Dashboard
-- [ ] Evaluación y métricas
-- [ ] Demo y pitch
+Toda la documentación está en [`docs/`](docs/00_INDICE.md): el reto, el dataset, la política del SOC, la
+arquitectura y los contratos, el setup, la capa LLM, la demo y los hallazgos del dataset
+([`docs/09_hallazgos.md`](docs/09_hallazgos.md)). Para trabajar con Claude Code, ver [`CLAUDE.md`](CLAUDE.md).
 
 ## 👥 Equipo
 
@@ -128,4 +177,5 @@ La capa LLM (`soc/llm.py`) prueba los proveedores en el orden de `LLM_PROVIDERS`
 
 ---
 
-*Proyecto desarrollado para **UAB The Hack** con el reto propuesto por **Deloitte**.*
+*Proyecto desarrollado para **UAB The Hack 2026** con el reto propuesto por **Deloitte**. Empresa, personas y
+datos de Tarvia Group son ficticios.*
