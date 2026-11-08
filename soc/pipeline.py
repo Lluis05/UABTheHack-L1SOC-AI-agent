@@ -273,14 +273,14 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
         on_step: OnStep | None = None, dedup: bool | None = None, use_cache: bool | None = None,
         save_traces: bool = True, api: SocApi | None | bool = None,
         incidents: list[dict] | None = None, correlate_new: bool = True,
-        save_incidents_file: bool | None = None) -> list[dict]:
+        save_incidents_file: bool = False) -> list[dict]:
     """Tría alertas. mode: 'live' (IA en todas) | 'normal' (IA solo si hace falta) | 'no_llm'.
 
     api: API del SOC como respaldo del enriquecimiento (lo que no esté en local). Por defecto solo en 'live';
     en los lotes grandes todo es local para no saturar la API.
     incidents: incidentes a los que unir las alertas (x_incident_id); por defecto, output/incidents.jsonl.
     correlate_new: además, agrupar en incidentes NUEVOS las alertas del lote relacionadas entre sí
-    (save_incidents_file: añadirlos a output/incidents.jsonl; por defecto solo en 'live')."""
+    (save_incidents_file: añadirlos a output/incidents.jsonl; solo lo pide el dashboard, triage_live)."""
     assert mode in ("live", "normal", "no_llm"), mode
     store = store or get_store()
     incidents = load_incidents() if incidents is None else incidents
@@ -383,7 +383,7 @@ def run(alerts: Iterable[dict], *, mode: str = "normal", workers: int = 5, store
     # 6 · alertas nuevas relacionadas entre sí → incidentes nuevos (los conocidos ya se unieron con attach)
     if correlate_new and len(contexts) <= BATCH_CORRELATE_MAX:
         new_incidents = correlate_batch(contexts, tickets, store, incidents)
-        if mode == "live" if save_incidents_file is None else save_incidents_file:
+        if save_incidents_file:
             save_incidents(new_incidents)
         for inc in new_incidents:
             for aid in inc["alert_ids"]:

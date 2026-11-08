@@ -139,7 +139,12 @@ def _cached(system: str, prompt: str, use_cache: bool) -> tuple[dict, str]:
     from soc.triage.agent import LLM_CACHE_DIR, PROMPT_VERSION
     from soc.llm import complete
 
-    key = hashlib.sha256("\0".join(["review", PROMPT_VERSION, system, prompt]).encode("utf-8")).hexdigest()
+    import os
+
+    # El modelo entra en la clave: si se cambia CLAUDE_MODEL no se reutilizan revisiones de otro modelo
+    key = hashlib.sha256("\0".join(["review", PROMPT_VERSION, os.getenv("LLM_PROVIDERS", ""),
+                                    os.getenv("CLAUDE_MODEL", ""), os.getenv("GEMINI_MODEL", ""),
+                                    system, prompt]).encode("utf-8")).hexdigest()
     path = LLM_CACHE_DIR / f"rev-{key}.json"
     if use_cache and path.exists():
         try:
