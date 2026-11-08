@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AppAlert, AppButton, AppFileButton, AppFixedArea, AppStack, AppTabs, AppText, AppTextField } from '../base'
+import { AppAlert, AppButton, AppFileDropZone, AppFixedArea, AppStack, AppTabs, AppTextField } from '../base'
 import { DEFAULT_RANDOM_ALERTS, INPUT_MODE, INPUT_MODES } from '../../config/constants.js'
 import { buildTriageRequest, parseAlerts } from '../../utils/triage.js'
 
@@ -38,11 +38,9 @@ export default function TriageInputForm({ running, maxAlerts, onSubmit }) {
                         placeholder='[{"alert_id": "ALR-…", "rule_id": "…"}] o una alerta por línea…' />
         ) : null}
         {mode === INPUT_MODE.FILE ? (
-          <AppStack direction="row" gap={1.5}>
-            <AppFileButton label="Elegir fichero" accept={ALERT_FILE_TYPES}
-                           onText={(content, name) => { setText(content); setFileName(name) }} />
-            {fileName ? <AppText tone="muted" role="status">{fileName}: {describeLoaded(text)}</AppText> : null}
-          </AppStack>
+          <AppFileDropZone label="Arrastra aquí el fichero de alertas (JSON, JSONL o TXT) o" buttonLabel="Elegir fichero"
+                           accept={ALERT_FILE_TYPES} onText={(content, name) => { setText(content); setFileName(name) }}
+                           status={fileName ? `${fileName}: ${describeLoaded(text)}` : ''} />
         ) : null}
         {mode === INPUT_MODE.IDS ? (
           <AppTextField label="IDs de alertas del dataset" name="alert_ids" variant="code" rows={INPUT_ROWS} fixedRows value={ids} onChange={setIds}

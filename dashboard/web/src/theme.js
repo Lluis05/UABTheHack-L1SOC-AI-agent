@@ -92,6 +92,8 @@ export const themeOptions = {
     asideDrawerWidth: 440, asideSheetHeight: '85dvh',
     // Upload: la zona de entrada y el progreso tienen alto fijo (no saltan al cambiar de modo ni al llegar alertas)
     uploadInputHeight: 230, uploadProgressHeight: '45dvh',
+    // Zona de soltar fichero: cabe en uploadInputHeight sin scroll (le resta el pt de AppFixedArea)
+    dropZoneHeight: 214,
   },
   components: {
     MuiCssBaseline: {
