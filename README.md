@@ -168,6 +168,7 @@ cd dashboard/web && npm test            # frontend
 │   ├── correlate/      # Incidentes multi-alerta e informe de investigación
 │   └── pipeline.py     # Orquestación y CLI
 ├── dashboard/          # React + FastAPI: cola, traza, evidencias, aprobación humana, triaje en vivo, chat del ticket
+├── presentacio/        # Presentación interactiva del pipeline con casos reales (ver su README)
 ├── eval/               # Etiquetas del equipo, verdad de incidentes, casos de inyección y evaluación
 ├── tests/              # pytest
 └── docs/               # Documentación del equipo
