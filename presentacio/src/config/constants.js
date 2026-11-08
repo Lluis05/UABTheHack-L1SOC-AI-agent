@@ -82,6 +82,5 @@ export const LEVEL_STATES = { done: 'hecho', partial: 'parcial' }
 export const LIMITS = [
   'Sin IA, 49 de 83 alertas de ataque quedan pendientes: nunca se cierran en silencio, pero necesitan IA o persona.',
   'Si Claude cae, Gemini gratis solo da 5 peticiones por minuto.',
-  'Si la IA descubre un activo más crítico, la matriz no recalcula la severidad (Logisoft → WMS01).',
   'El informe de investigación (nivel 3) se genera, pero el dashboard aún no lo enseña.',
 ]

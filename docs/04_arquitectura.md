@@ -183,6 +183,11 @@ RRHH (bajas, actividad tras la baja, viajes), inteligencia (TIP, Tor/hosting, de
 patrones conocidos de FP/TP por regla del SIEM y **PROMPT_INJECTION_TEXT**.
 
 ### SeverityResult — `soc/policy/severity.py`
+La criticidad (`max_criticality`) sale de los activos, servicios e identidades del contexto. Además de los activos
+de la alerta, cuenta el **destino de la sesión**: el activo interno de la CMDB al que llega sin bloqueo un evento de la
+propia alerta (`_via: "destino de la sesión (<event_id>)"`, p. ej. VPN de Logisoft → RDP a WMS01). Lo añade el código
+en `build_context`; la IA no puede subir la criticidad.
+
 ```json
 {"rule_severity":"low","max_criticality":"Crítica","criticality_source":"WEB-ECOM01",
  "base":"medium","adjustment":-1,"plus_reasons":[],"minus_reasons":["bloqueado por el WAF antes de producir efecto"],

@@ -112,6 +112,12 @@ después; el portátil LT-T07-02 y los TPV POS-T07-0x comparten `location` en la
 RAM scraping). Con esas dos claves derivadas: INC-07 pasa de 12/18 a **18/18**, INC-11 de 4/5 a **5/5**, siguen 12/12
 y el falso sigue siendo 1 (de 13).
 
+**El destino de la sesión también cuenta para la severidad (Marc, 8/11):** la misma clave se usa en el contexto
+(`session_destinations` en `soc/enrich/context.py`). Un activo interno de la CMDB al que llega sin bloqueo un evento
+de la propia alerta entra en `assets` con `_via: "destino de la sesión (<event_id>)"` y la matriz lo cuenta. En todo el
+dataset afecta solo a las 6 VPN de Logisoft que hacen RDP a WMS01 (Alta): pasan de low a **medium**. Las VPN legítimas
+de Logisoft y la de CHG-1071 no cambian.
+
 **Señuelos (todos con cambio, viaje o flujo aprobado que encaja en origen, cuenta, ventana y alcance):** pentest
 CHG-1042 (20), Nessus los miércoles (19), PsExec de adm.dnavarro en CHG-1057 (4), viaje de ricard.castells (1),
 nóminas FLUJO-0007 (2), OT vía JUMP01 en CHG-1063 (1), Backup Operators CHG-1078 (1), EDR parado en CHG-1080 (6),

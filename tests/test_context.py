@@ -28,6 +28,18 @@ def test_waf_alert_gets_shop_assets():
     assert any(b["servicio"].startswith("Tienda online") for b in ctx["business_services"])
 
 
+def test_session_destination_counts_in_the_matrix():
+    """La VPN robada de Logisoft no trae ningún activo, pero su sesión hace RDP a WMS01 (Alta): la matriz lo cuenta."""
+    s = get_store()
+    ctx = build_context(s.alert("ALR-20261011-011877"), s)
+    wms = next(a for a in ctx["assets"] if a["hostname"] == "WMS01")
+    assert wms["_via"] == "destino de la sesión (FW-0026536)"
+    assert ctx["severity"]["max_criticality"] == "Alta"
+    assert ctx["severity"]["final"] == "medium"
+    # Una VPN legítima de Logisoft, sin evento de sesión, sigue sin activo
+    assert not build_context(s.alert("ALR-20261009-002236"), s)["assets"]
+
+
 def test_new_and_malformed_alerts_never_break():
     s = get_store()
     new = {"alert_id": "ALR-DEFENSA-0001", "created_at": "2026-11-08T09:00:00.000Z", "source_product": "EDR",

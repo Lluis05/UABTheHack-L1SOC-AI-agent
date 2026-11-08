@@ -52,6 +52,20 @@ class _Tracer:
                            "ms": round((time.perf_counter() - t0) * 1000, 2), **extra})
 
 
+def session_destinations(related: list[dict], assets: dict, store) -> list[tuple[dict, str]]:
+    """Activos internos de la CMDB a los que llega (sin bloqueo) un evento de la alerta y que aún no están en ella."""
+    out, seen = [], set(assets)
+    for e in related:
+        dst = e.get("dst_ip")
+        if not dst or not _is_internal_ip(dst) or str(e.get("action") or "").lower() in BLOCKED_ACTIONS:
+            continue
+        a = store.asset(dst)
+        if a and a.get("hostname") and a["hostname"] not in seen:
+            seen.add(a["hostname"])
+            out.append((a, e.get("event_id", "?")))
+    return out
+
+
 def _is_internal_ip(v: str) -> bool:
     try:
         ip = ipaddress.ip_address(v)
@@ -89,6 +103,7 @@ IMPLIED_BY_PRODUCT = {
     "AI_GATEWAY": ["AI-ASSIST01"],
 }
 SHOP_DOMAINS = ("www.tarvia.example", "api.tarvia.example")
+BLOCKED_ACTIONS = ("deny", "drop", "block", "blocked", "reset")   # una conexión bloqueada no llega al destino
 
 
 def _expand_service_assets(spec: str) -> list[str]:
@@ -223,6 +238,19 @@ def build_context(alert: dict, store: DataStore | None = None, *,
     tr.add("related_events", f"{len(alert.get('related_events') or [])} ids",
            f"{len(related)} encontrados" + (f", {len(missing)} NO encontrados" if missing else ""), t0, source="Logs")
     related_ids = {e["event_id"] for e in related}
+
+    # Destino de la sesión: el activo interno al que llegan los eventos de la propia alerta también está afectado
+    # (VPN de Logisoft → RDP a WMS01). Entra en la matriz igual que los activos de la alerta: lo decide el código.
+    t0 = time.perf_counter()
+    new_assets = session_destinations(related, assets, store)
+    for a, eid in new_assets:
+        assets[a["hostname"]] = {**_pick(a, ASSET_FIELDS), "_via": f"destino de la sesión ({eid})"}
+        tr.add("cmdb", a["hostname"], f"destino de la sesión ({eid}) · criticidad {a['criticality']} · {a['zone']}",
+               t0, source="CMDB")
+    if new_assets:
+        known = {s_["servicio"] for s_ in services}
+        services += [s_ for s_ in business_services_for([a["hostname"] for a, _ in new_assets], store)
+                     if s_["servicio"] not in known]
 
     # 4 · Correlar: actividad de cada entidad ±24 h (sin hubs)
     activity: dict[str, dict[str, list[dict]]] = {}
