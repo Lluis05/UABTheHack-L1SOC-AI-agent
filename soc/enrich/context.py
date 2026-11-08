@@ -23,6 +23,7 @@ from typing import Any
 
 from soc import config
 from soc.data.store import DataStore, get_store
+from soc.enrich import osint
 from soc.enrich.entities import base_domain, entity_keys, is_ip
 from soc.timeutil import local_to_utc, shift, window
 
@@ -274,6 +275,20 @@ def build_context(alert: dict, store: DataStore | None = None, *,
         intel.append({"indicator": ind, "type": typ, "tip": tip, "geo": geo})
         tr.add("intel", ind, " · ".join(parts) or "sin datos en TIP/GeoIP (desconocido ≠ limpio)", t0,
                source="TIP/GeoIP")
+
+    # 3b · OSINT externo (opcional, OSINT_ENABLED=1): solo reputación, con presupuesto por alerta
+    if osint.enabled():
+        queryable = [i for i in intel if osint.is_queryable(i["indicator"], i["type"])]
+        # primero lo que el TIP interno no conoce: ahí es donde el OSINT aporta
+        queryable.sort(key=lambda i: i["tip"] is not None)
+        for i in queryable[:osint.max_per_alert()]:
+            t0 = time.perf_counter()
+            res = osint.lookup(i["indicator"], i["type"])
+            i["osint"] = res
+            tr.add("osint", i["indicator"], osint.describe(res), t0, source="OSINT")
+        if len(queryable) > osint.max_per_alert():
+            tr.add("osint", f"{len(queryable) - osint.max_per_alert()} indicadores más",
+                   "no consultados (presupuesto por alerta)", time.perf_counter(), source="OSINT")
 
     sandbox = []
     for h in ents.get("hashes", []):

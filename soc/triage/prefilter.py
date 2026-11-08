@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from soc.enrich.osint import describe as osint_describe
 from soc.policy import suggest_verdict
 
 VERDICT_ES = {"true_positive": "verdadero positivo", "benign_true_positive": "actividad autorizada",
@@ -134,6 +135,9 @@ def prefilter(ctx: dict) -> dict | None:
             res.append(f"{geo.get('country')} · {geo.get('as_org')}")
         enrichment.append({"indicator": i["indicator"], "type": i["type"],
                            "source": "ti_feed+geoip_asn", "result": "; ".join(res) or "sin datos (desconocido ≠ limpio)"})
+        if i.get("osint"):
+            enrichment.append({"indicator": i["indicator"], "type": i["type"], "source": "osint",
+                               "result": osint_describe(i["osint"])})
 
     final = sev.get("final", "medium")
     if sug["verdict"] in ("false_positive", "benign_true_positive"):
