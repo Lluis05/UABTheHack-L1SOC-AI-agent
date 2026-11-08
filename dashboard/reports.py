@@ -57,6 +57,7 @@ def generating(incident_id: str) -> bool:
 def generate(incident: dict, out_dir: Path, store=None, *, fresh: bool = False) -> dict:
     """Pide el informe al investigador (LLM + validación en código) y lo guarda. Una sola ejecución por incidente."""
     from soc.correlate.investigate import investigate
+    from soc.pipeline import DASHBOARD_LLM_CACHE
 
     incident_id = incident["incident_id"]
     path = report_path(out_dir, incident_id)
@@ -65,7 +66,8 @@ def generate(incident: dict, out_dir: Path, store=None, *, fresh: bool = False) 
             raise ReportError(409, f"ya se está generando el informe de {incident_id}")
         _running.add(incident_id)
     try:
-        report = investigate(incident, store, use_cache=not fresh)   # nunca lanza: sin IA devuelve x_no_ai
+        # Desde el dashboard el informe nunca sale de la caché del LLM (como el triaje en directo)
+        report = investigate(incident, store, use_cache=DASHBOARD_LLM_CACHE and not fresh)  # sin IA: x_no_ai
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         return {**report, "x_stale": False}

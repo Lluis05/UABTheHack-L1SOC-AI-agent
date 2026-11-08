@@ -52,3 +52,14 @@ def test_generate_saves_the_report_and_frees_the_slot(tmp_path, monkeypatch):
     assert report["title"] == "nuevo" and calls == [False]
     assert json.loads((tmp_path / s.REPORTS_DIR / "INC-0001.json").read_text(encoding="utf-8"))["title"] == "nuevo"
     assert not reports.generating("INC-0001")
+
+
+def test_generate_never_uses_llm_cache_from_dashboard(tmp_path, monkeypatch):
+    """«Generar informe» (sin fresh) tampoco puede salir de la caché del LLM."""
+    import soc.correlate.investigate as inv
+
+    calls = []
+    monkeypatch.setattr(inv, "investigate", lambda incident, store, use_cache: calls.append(use_cache) or
+                        {"incident_id": incident["incident_id"], "alert_ids": incident["alert_ids"], "title": "t"})
+    reports.generate(INCIDENT, tmp_path)
+    assert calls == [False]
