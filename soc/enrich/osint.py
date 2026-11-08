@@ -239,24 +239,27 @@ def lookup(indicator: str, typ: str, *, feeds: Feeds | None = None, threatfox: T
            use_cache: bool = True) -> dict[str, Any]:
     """Reputación externa de un indicador. Nunca lanza.
 
-    → {"indicator", "type", "hits": [{"source", "result"}], "sources": [consultadas], "errors": [...]}
-    hits vacío = ninguna fuente lo conoce (desconocido ≠ limpio).
+    → {"indicator", "type", "verdict", "hits": [{"source", "result"}], "sources_checked": [consultadas],
+       "errors": [...]}
+    hits vacío = ninguna fuente lo conoce (desconocido ≠ limpio). "verdict" lo dice en una frase porque el LLM
+    leía la lista de fuentes consultadas como si fueran coincidencias.
     """
     feeds, threatfox = feeds or _feeds, threatfox or _threatfox
-    out: dict[str, Any] = {"indicator": indicator, "type": typ, "hits": [], "sources": [], "errors": []}
+    out: dict[str, Any] = {"indicator": indicator, "type": typ, "verdict": "", "hits": [], "sources_checked": [], "errors": []}
     try:
         out["hits"] += feeds.lookup(indicator, typ)
-        out["sources"] += [n for n, (_, t) in FEEDS.items() if t == typ]
+        out["sources_checked"] += [n for n, (_, t) in FEEDS.items() if t == typ]
         out["errors"] += [f"{n}: {e}" for n, e in feeds.errors.items() if FEEDS[n][1] == typ]
     except Exception as e:  # noqa: BLE001
         out["errors"].append(f"listas: {e}")
     if threatfox.available():
         r = threatfox.lookup(indicator, typ, use_cache=use_cache)
-        out["sources"].append("threatfox")
+        out["sources_checked"].append("threatfox")
         if r.get("result"):
             out["hits"].append({"source": "threatfox", "result": r["result"]})
         if r.get("error"):
             out["errors"].append(f"threatfox: {r['error']}")
+    out["verdict"] = describe(out)
     return out
 
 
@@ -264,7 +267,8 @@ def describe(res: dict) -> str:
     """Una línea para la traza del dashboard."""
     if res["hits"]:
         return " · ".join(h["result"] for h in res["hits"])
-    if res["errors"] and len(res["errors"]) >= len(res["sources"]):
+    if res["errors"] and len(res["errors"]) >= len(res["sources_checked"]):
         return "OSINT no disponible: " + "; ".join(res["errors"])
-    base = f"sin coincidencias en {len(res['sources'])} fuentes (desconocido ≠ limpio)"
+    base = (f"0 coincidencias: ninguna de las {len(res['sources_checked'])} fuentes consultadas lo conoce "
+            "(desconocido ≠ limpio)")
     return base + (" · con errores: " + "; ".join(res["errors"]) if res["errors"] else "")

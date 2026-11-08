@@ -498,10 +498,13 @@ def r_known_patterns(ctx, store):
         dom = str(ev.get("domain") or "")
         tip = next((i.get("tip") for i in ctx.get("intel") or [] if i["indicator"] == dom), None)
         bd_events = store.entity_count(base_domain(dom)) if store and dom else 0
-        if age is not None and age > 365 and not tip and bd_events > 1000:
+        # Una entrada benigna en el TIP (known-good) refuerza el FP; solo una maliciosa/sospechosa lo impide
+        tip_ok = not tip or str(tip.get("reputation") or "").lower() in TIP_BENIGN
+        if age is not None and age > 365 and tip_ok and bd_events > 1000:
+            known = " y el TIP lo marca benigno" if tip else ""
             out.append(hit("KNOWN_SERVICE_BEACON", "benign", f"{dom}: dominio de {int(age)} días de antigüedad y muy "
-                           f"usado en la organización ({bd_events} eventos): telemetría o sincronización legítima",
-                           "UC-NET-001", "false_positive"))
+                           f"usado en la organización ({bd_events} eventos){known}: telemetría o sincronización "
+                           "legítima", "UC-NET-001", "false_positive"))
         elif age is not None and age < 60:
             out.append(hit("YOUNG_DOMAIN_BEACON", "suspicious", f"{dom}: dominio de solo {int(age)} días con beaconing "
                            f"(intervalo medio {ev.get('mean_interval_s')} s)", "UC-NET-001"))
@@ -550,6 +553,7 @@ def r_known_patterns(ctx, store):
 # RB-01 decide distinto «sin entrega masiva» (cerrar) y con ella, pero no fija el umbral. Criterio propio: a
 # partir de 10 buzones distintos del mismo remitente en ±24 h es una campaña (el ruido de un remitente
 # legítimo ya lo descarta LEGIT_BULK_SENDER antes).
+TIP_BENIGN = ("benign", "known-good", "clean")
 MASS_DELIVERY_MIN_MAILBOXES = 10
 SCOPE_WINDOW_H = 24
 

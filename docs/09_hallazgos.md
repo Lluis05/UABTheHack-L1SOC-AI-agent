@@ -66,6 +66,13 @@ Revisión de tickets reales contra `politica_soc.md`, RB-01/03/05/09 y el PowerP
   (usar redes RFC 1918). Varias IPs de «escáner de Internet» de la GeoIP coinciden con la conexión de casa de
   empleados (logins desde ES con su operador): no son actividad del atacante.
 - Métricas contra etiquetas: sin cambios (64,5 % veredicto estricto, 0 falsas alarmas, sin IA).
+- **Beaconing a Microsoft (8/11 03:30):** `KNOWN_SERVICE_BEACON` exigía que el dominio NO estuviera en el TIP, y
+  `teams.microsoft.com` está como benign/known-good → iba a la IA, que lo cerraba con confianza 0,62 (< 0,7) y quedaba
+  abierto. Ahora un TIP benigno refuerza el FP: 317 alertas UC-NET-001 (`teams.microsoft.com`,
+  `settings-win.data.microsoft.com`) se cierran sin IA. Ninguna está en incidentes ni en etiquetas.
+- **OSINT y el LLM:** el campo `sources` (fuentes consultadas) lo leía la IA como coincidencias («¿por qué el OSINT
+  lista teams.microsoft.com en c2intel_dom y threatfox?») y bajaba la confianza. Renombrado a `sources_checked` y
+  añadido `verdict` («0 coincidencias: ninguna de las N fuentes consultadas lo conoce»).
 
 ## Patrones de falsos positivos o benignos
 - (Lluis 14:00) Lo que la política decide sola, con justificación (87 % de las 11.061 alertas): SCCM (1.349), viaje imposible con móvil corporativo conocido y conforme (899), WAF bloqueado (3.386 TP de severidad baja), newsletters con SPF/DKIM/DMARC correctos (≈1.650), app de negocio firmada desde Excel (531), subdominios de CDN (473), Vela con el cliente corrigiéndose (316), AV en cuarentena (411), pentest (20), Nessus (19), OT desde ENG-WS01 (9: regla mal afinada).

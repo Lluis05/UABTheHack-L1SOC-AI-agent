@@ -315,3 +315,28 @@ def test_phishing_campaign_clicks_by_other_recipients_count():
     hint = prefilter(ctx)
     monitored = {a["target"] for a in (hint or {}).get("recommended_actions", []) if a["action"] == "monitor"}
     assert hint is None or "lucia.castro@tarvia.example" in monitored
+
+
+def test_beacon_to_benign_tip_domain_is_known_service():
+    """teams.microsoft.com está en el TIP como benign/known-good: eso refuerza el FP, no lo impide."""
+    s = get_store()
+    ctx = build_context(s.alert("ALR-20261021-006513"), s)
+    assert "KNOWN_SERVICE_BEACON" in [h["rule"] for h in ctx["policy_hits"]]
+
+
+def test_osint_result_says_no_hits_explicitly():
+    from soc.enrich import osint
+
+    class NoFeeds:
+        errors: dict = {}
+
+        def lookup(self, indicator, typ):
+            return []
+
+    class NoTF:
+        @staticmethod
+        def available():
+            return False
+
+    r = osint.lookup("example.org", "domain", feeds=NoFeeds(), threatfox=NoTF())
+    assert r["hits"] == [] and "sources" not in r and r["verdict"].startswith("0 coincidencias")

@@ -134,8 +134,8 @@ Para tener contextos reales en disco: `python -m soc.enrich.context --sample` �
   "missing_related_events": ["ids que la alerta cita pero no existen (alertas nuevas)"],
   "entity_activity": {"<entidad>": {"<fuente>": [eventos ±24h, máx 20 por fuente, sin repetir eventos]}},
   "intel":   [{"indicator":"1.2.3.4","type":"ip|domain|sha256|url|email","tip":{...}|null,"geo":{...}|null,
-              "osint":{"hits":[{"source":"ipsum|tor_exit|c2intel_ip|c2intel_dom|threatfox","result":"..."}],
-                       "sources":[...],"errors":[...]}}],   // "osint" solo con OSINT_ENABLED=1 (soc/enrich/osint.py)
+              "osint":{"verdict":"0 coincidencias…|<resultados>","hits":[{"source":"ipsum|tor_exit|c2intel_ip|c2intel_dom|threatfox","result":"..."}],
+                       "sources_checked":[...],"errors":[...]}}],   // "osint" solo con OSINT_ENABLED=1 (soc/enrich/osint.py)
   "sandbox": [{...informe...}],
   "other_alerts": [{"alert_id":"...","rule_id":"...","rule_name":"...","severity":"...","created_at":"...",
                     "shared_entities":["..."]}],          // ±7 días, máx 40, sin hubs
