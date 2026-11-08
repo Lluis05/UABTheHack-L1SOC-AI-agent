@@ -102,6 +102,50 @@ def closing_actions(hits: list[dict], actions: list[dict], host: str, rule_id: s
     return out
 
 
+# Contención que piden los runbooks para un true_positive decidido por la política (§4: la propone el N1;
+# quién la aprueba lo calcula soc/policy/approvals.py). Sin esto, el ticket solo diría «escalar».
+EXECUTION_HITS = {"SANDBOX_MALICIOUS", "AV_EXECUTED"}            # RB-02: ejecución confirmada en el equipo
+EDR_STOPPED = ("blocked", "quarantined")                          # el EDR lo paró: no hace falta aislar
+CREDENTIAL_HITS = {"LOGISOFT_UNUSUAL_SOURCE", "ADM_OUTSIDE_JUMP01"}  # RB-03: credenciales usadas por un tercero
+SUPPLY_CHAIN_HIT = "TARVIA_PKG_PUBLIC_REGISTRY"                   # RB-10: paquete que lee secretos del build
+BUILD_OWNER = "Equipo de DevOps (responsable del pipeline)"
+
+
+def containment_actions(ctx: dict, hits: list[dict], vals: dict) -> list[dict]:
+    """Acciones de contención de los runbooks para un true_positive (solo se proponen; nunca se ejecutan)."""
+    ev = (ctx.get("alert") or {}).get("evidence")
+    ev = ev if isinstance(ev, dict) else {}
+    ents = ctx.get("entities") or {}
+    names = {h["rule"] for h in hits}
+    host, user, ip = (v if v and v != "?" else "" for v in (vals["host"], vals["user"], vals["ip"]))
+    out = []
+    supply = next((h for h in hits if h["rule"] == SUPPLY_CHAIN_HIT and h.get("plus")), None)
+    edr_action = str(ev.get("edr_action") or ev.get("action") or "").lower()
+    # En CI/CD manda RB-10 (rotar secretos), no aislar el runner
+    if names & EXECUTION_HITS and host and not supply and not any(k in edr_action for k in EDR_STOPPED):
+        out.append({"action": "isolate_host", "target": host,
+                    "justification": "RB-02: ejecución confirmada y el EDR no la bloqueó → aislar el equipo"})
+    if names & CREDENTIAL_HITS and user:
+        out += [{"action": "revoke_sessions", "target": user,
+                 "justification": "RB-03: sesión con credenciales usadas desde un origen no autorizado"},
+                {"action": "reset_password", "target": user,
+                 "justification": "RB-03: forzar el cambio de contraseña de la cuenta expuesta"}]
+        if ip:
+            out.append({"action": "block_ioc", "target": ip, "justification": "RB-03: bloquear el origen anómalo"})
+    if supply:
+        secrets = ", ".join(str(v) for v in ev.get("env_vars_read") or []) or "los secretos del build"
+        if any("AWS" in str(v).upper() for v in ev.get("env_vars_read") or []):
+            out.append({"action": "disable_access_key", "target": f"AWS_ACCESS_KEY_ID del build {ev.get('build') or host}",
+                        "justification": "RB-10: el paquete leyó las claves cloud del entorno del build"})
+        out.append({"action": "notify", "target": BUILD_OWNER,
+                    "justification": f"RB-10: rotar todas las credenciales del entorno del build ({secrets}), revisar "
+                                     "lo desplegado y buscar en cloudtrail el uso posterior de las claves"})
+        for dom in ents.get("domains") or []:
+            out.append({"action": "block_ioc", "target": dom,
+                        "justification": "RB-10: dominio al que el paquete envió los secretos"})
+    return out
+
+
 def _monitor_target(vals: dict) -> str:
     """Entidad a vigilar: el equipo, si no el usuario, si no la IP (nunca «?»)."""
     return next((v for v in (vals["host"], vals["user"], vals["ip"]) if v and v != "?"), "entidad afectada")
@@ -180,6 +224,11 @@ def prefilter(ctx: dict) -> dict | None:
         actions = [{"action": "monitor", "target": _monitor_target(vals),
                     "justification": "Vigilar 24 h la entidad afectada"}]
     actions += closing_actions(hits, actions, vals["host"], alert.get("rule_id") or "")
+    if sug["verdict"] == "true_positive":
+        contain = [a for a in containment_actions(ctx, hits, vals)
+                   if not any(b["action"] == a["action"] and b["target"] == a["target"] for b in actions)]
+        if contain:  # con contención concreta, «vigilar» sobra
+            actions = [a for a in actions if a["action"] != "monitor"] + contain
     for i in ctx.get("intel") or []:
         if sug["verdict"] == "true_positive" and (i.get("tip") or {}).get("reputation") == "malicious" \
                 and not any(a["action"] == "block_ioc" and a["target"] == i["indicator"] for a in actions):

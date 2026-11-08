@@ -114,3 +114,52 @@ def test_closing_actions_from_runbooks():
     nessus = _ticket(_first(lambda a: a["rule_id"] == "UC-NET-003" and "NESSUS01" in str(a["entities"])))
     assert "propose_rule_exclusion" in {a["action"] for a in nessus["recommended_actions"]}
     assert nessus["x_status"] == "closed"
+
+
+# ------------------------------------------------------------------ contención de los runbooks (prefiltro)
+from soc.policy.severity import compute_severity  # noqa: E402
+from soc.triage.prefilter import containment_actions  # noqa: E402
+
+VALS = {"host": "WS-BCN-1770", "user": "ext.logisoft@tarvia.example", "ip": "77.90.185.20"}
+
+
+def _ctx(evidence=None, domains=None):
+    return {"alert": {"evidence": evidence or {}}, "entities": {"domains": domains or []}}
+
+
+def _acts(ctx, hits, vals=VALS):
+    return {(a["action"], a["target"]) for a in containment_actions(ctx, hits, vals)}
+
+
+def test_execution_isolates_host_unless_edr_stopped_it():
+    # RB-02: ejecución confirmada → proponer aislar el equipo
+    assert ("isolate_host", "WS-BCN-1770") in _acts(_ctx({"edr_action": "detected_only"}), [hit("SANDBOX_MALICIOUS")])
+    assert not _acts(_ctx({"edr_action": "quarantined"}), [hit("SANDBOX_MALICIOUS")])
+
+
+def test_third_party_credentials_revoke_reset_and_block():
+    # RB-03: credenciales usadas desde un origen anómalo
+    assert _acts(_ctx(), [hit("LOGISOFT_UNUSUAL_SOURCE")]) == {
+        ("revoke_sessions", VALS["user"]), ("reset_password", VALS["user"]), ("block_ioc", VALS["ip"])}
+
+
+def test_supply_chain_rotates_secrets_without_isolating_runner():
+    # RB-10: rotar las credenciales del build y bloquear el destino; no aislar el runner
+    ev = {"env_vars_read": ["AWS_ACCESS_KEY_ID", "NPM_TOKEN"], "build": "ecom#1"}
+    acts = _acts(_ctx(ev, ["exfil.example"]),
+                 [hit("TARVIA_PKG_PUBLIC_REGISTRY", plus="robo de secretos"), hit("SANDBOX_MALICIOUS")])
+    assert ("disable_access_key", "AWS_ACCESS_KEY_ID del build ecom#1") in acts
+    assert ("block_ioc", "exfil.example") in acts and not any(a == "isolate_host" for a, _ in acts)
+    assert not _acts(_ctx(ev), [hit("TARVIA_PKG_PUBLIC_REGISTRY")])  # sin secretos leídos, nada que rotar
+
+
+def test_supply_chain_escalation_names_its_own_rule():
+    reasons = mandatory_escalation("true_positive", [hit("TARVIA_PKG_PUBLIC_REGISTRY", plus="robo de secretos")])
+    assert any("TARVIA_PKG_PUBLIC_REGISTRY" in r for r in reasons)
+    assert not any("ADM_OUTSIDE_JUMP01" in r for r in reasons)
+
+
+def test_severity_rationale_states_final_level_once():
+    for kw in ({"false_positive": True}, {"authorized": True}):
+        rationale = compute_severity("medium", "Media", **kw)["rationale"]
+        assert rationale.count("→ informational") == 1

@@ -84,10 +84,10 @@ def compute_severity(rule_severity: str, max_crit: str, plus_reasons: list[str] 
         parts.append("los ajustes se compensan")
     if authorized:
         final = "low" if LEVELS.index(base) >= LEVELS.index("high") else "informational"
-        parts.append(f"actividad autorizada (cambio o flujo aprobado) → {final}")
+        parts.append("actividad autorizada (cambio o flujo aprobado)")
     elif false_positive:
         final = "informational"
-        parts.append("falso positivo de la regla → informational")
+        parts.append("falso positivo de la regla")
     return {"rule_severity": rule, "max_criticality": crit, "criticality_source": criticality_source,
             "base": base, "adjustment": adj, "plus_reasons": plus, "minus_reasons": minus,
             "authorized": authorized, "false_positive": false_positive, "final": final,

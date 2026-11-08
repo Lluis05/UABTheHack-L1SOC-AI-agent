@@ -32,7 +32,8 @@ LLM_CLOSE_MIN_CONFIDENCE = 0.7
 # hits: reglas de soc/policy/rules.py · rules: casos de uso del SIEM cuyo true_positive ya implica el criterio.
 MANDATORY = [
     ("ejecución confirmada de código malicioso", {"AV_EXECUTED"}, set()),
-    ("robo de credenciales", {"ADM_OUTSIDE_JUMP01", "LOGISOFT_UNUSUAL_SOURCE", "CONFIRMED_ACCESS"},
+    ("robo de credenciales",
+     {"ADM_OUTSIDE_JUMP01", "LOGISOFT_UNUSUAL_SOURCE", "CONFIRMED_ACCESS", "TARVIA_PKG_PUBLIC_REGISTRY"},
      {"UC-EDR-004", "UC-IDP-006"}),
     ("persistencia", {"PRIV_GROUP_NO_CHANGE"}, {"UC-IDP-005", "UC-IDP-007", "UC-CLD-002"}),
     ("datos personales que han podido salir (implica DPO)", {"VELA_CROSS_CUSTOMER"},
@@ -51,8 +52,8 @@ def mandatory_escalation(verdict: str, hits: list[dict], rule_id: str = "") -> l
         return []
     names = {h.get("rule") for h in hits or []}
     blocked = any(h.get("minus") for h in hits or [])
-    if any(h.get("rule") == SECRETS_HIT and h.get("plus") for h in hits or []):
-        names.add("ADM_OUTSIDE_JUMP01")  # mismo criterio: credenciales expuestas
+    if not any(h.get("rule") == SECRETS_HIT and h.get("plus") for h in hits or []):
+        names.discard(SECRETS_HIT)  # sin secretos leídos no hay robo de credenciales
     reasons = []
     for criterion, by_hit, by_rule in MANDATORY:
         if criterion in BLOCKABLE and blocked:

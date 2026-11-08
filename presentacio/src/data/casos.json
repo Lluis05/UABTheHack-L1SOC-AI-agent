@@ -619,7 +619,7 @@
    "base": "medium",
    "adjustment": 0,
    "final": "informational",
-   "rationale": "Regla medium × activo Media (WS-BCN-1238) = medium; falso positivo de la regla → informational → informational.",
+   "rationale": "Regla medium × activo Media (WS-BCN-1238) = medium; falso positivo de la regla → informational.",
    "suggestion": {
     "verdict": "false_positive",
     "decisive": true,
@@ -634,7 +634,7 @@
    "verdict": "false_positive",
    "confidence": 0.9,
    "severity": "informational",
-   "severity_rationale": "Regla medium × activo Media (WS-BCN-1238) = medium; falso positivo de la regla → informational → informational.",
+   "severity_rationale": "Regla medium × activo Media (WS-BCN-1238) = medium; falso positivo de la regla → informational.",
    "summary": "PowerShell con -EncodedCommand lanzado por CcmExec.exe (agente SCCM) como SYSTEM a las 07:39 UTC (09:39 local) en WS-BCN-1238. El contenido decodificado es Get-CimInstance Win32_Product volcado a C:\\Windows\\CCM\\Inventory\\sw.json, que es inventario. Encaja con CHG-2026-1031 en origen (SCCM), cuenta (SYSTEM/agente), ventana diaria 08-10 h local y alcance (todos los puestos). El binario está firmado por Microsoft y no …",
    "evidence": [
     {
