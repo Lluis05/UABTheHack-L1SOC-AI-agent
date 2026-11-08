@@ -56,20 +56,28 @@ Detalle completo y contratos entre módulos en [`docs/04_arquitectura.md`](docs/
 
 ## 📊 Resultados medidos
 
-- **Todo el dataset sin IA** (`--all --no-llm`): la política decide sola **9.538 de 10.972 tickets (87 %)**; los 1.434
+- **Todo el dataset sin IA** (`--all --no-llm`): la política decide sola **9.548 de 10.972 tickets (87 %)**; los 1.424
   restantes quedan pendientes de IA. Ninguno se cierra en silencio: los pendientes high/critical se escalan a una persona.
+- **Simulacros de la defensa** (`--live`, la IA razona cada alerta en directo, sin caché):
+  - 10 alertas al azar (`--random 10`): **73 s** en total (unos 7 s por alerta en paralelo), 10/10 con IA.
+  - 10 alertas de 10 incidentes reales distintos, con la API simulada y el OSINT activados: **128 s** en total
+    (unos 13 s por alerta en paralelo), **10/10 true_positive y 10/10 escaladas a N2**.
+  - Un N1 humano tarda unos 15 min por alerta.
 - **Prompt injection:** **6/6** inyecciones detectadas y **0** veredictos cambiados, con 0 falsas detecciones en el
   control. Incluye un caso real del dataset (`ALR-20261020-011905`, factura falsa con texto oculto que pide marcarla como
   false_positive).
 - **Correlación:** encuentra los **12/12** incidentes de nuestra verdad de threat hunting (`eval/incidents_truth.jsonl`).
-- **Tests:** 159 tests en Python (`pytest`) y tests del frontend (`vitest`). Ningún test puede gastar cuota del LLM.
+- **OSINT** (opcional): con las listas públicas ya cargadas añade unos milisegundos por alerta; en el simulacro encontró
+  la IP de la VPN de Logisoft y la del C2 del minero de Jenkins en 8 listas negras de IPsum.
+- **Tests:** 184 tests en Python (`pytest`) y tests del frontend (`vitest`). Ningún test puede gastar cuota del LLM.
 
 ## 🔒 Seguridad por diseño
 
 - **Datos no confiables:** todo lo que viene de alertas y logs (asuntos, prompts, command lines…) va dentro de
   `<untrusted_data>` y se trata como dato, nunca como instrucción. La política detecta los intentos de inyección.
 - **El LLM no tiene herramientas** (`claude -p` sin tools) ni acceso a los endpoints de contención.
-- **Indicadores reales del dataset:** no se visitan, no se descargan ni se escanean.
+- **Indicadores reales del dataset:** no se visitan, no se descargan ni se escanean. El OSINT solo consulta servicios
+  de reputación.
 
 ## ⚠️ Lo que no resolvemos
 
@@ -81,8 +89,9 @@ Resumen; la lista completa, con datos, está en [`docs/08_demo_y_pitch.md`](docs
   `[SIN IA]` con la decisión de la política.
 - **La correlación parte dos incidentes en piezas** cuando las fases no comparten ninguna entidad (Logisoft y la
   tienda T07). Un analista las une; el código no. Genera además 1 incidente falso de 14.
-- **Sin OSINT externo:** el enriquecimiento usa el TIP interno, GeoIP y el sandbox de la API; no consultamos
-  VirusTotal ni AbuseIPDB.
+- **OSINT limitado:** además del TIP interno, GeoIP y el sandbox, consultamos listas públicas de reputación (Tor,
+  IPsum, C2IntelFeeds) y ThreatFox (con clave), hasta 3 indicadores por alerta. No consultamos VirusTotal ni AbuseIPDB,
+  y viene desactivado por defecto (`OSINT_ENABLED=1`).
 - **Listas fijas** de servicios legítimos e infraestructura conocida, que en otra empresa habría que mantener.
 - **Las etiquetas de evaluación son nuestras:** la verdad la ha construido el equipo con threat hunting.
 
@@ -106,7 +115,7 @@ git clone https://github.com/Lluis05/UABTheHack-L1SOC-AI-agent.git
 cd UABTheHack-L1SOC-AI-agent
 python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env        # DATASET_DIR y GEMINI_API_KEY (fallback y chat)
+cp .env.example .env        # DATASET_DIR, GEMINI_API_KEY (fallback y chat) y, opcional, OSINT_ENABLED y ABUSECH_AUTH_KEY
 claude                      # login en Claude Code (una sola vez)
 python -m soc.llm           # prueba rápida de la capa LLM
 ```
