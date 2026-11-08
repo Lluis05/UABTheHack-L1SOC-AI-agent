@@ -61,10 +61,12 @@ Datos reales medidos contra nuestra verdad del threat hunting (`eval/incidents_t
   credential stuffing, túnel DNS de WMS01, AiTM, fuga de nuria.vidal... Necesitan el LLM o una persona.
 - **Si Claude se cae, Gemini gratis no aguanta la defensa:** 5 peticiones/min → solo 2 de 10 alertas con IA en
   210 s. El resto sale marcado `[SIN IA]` con la decisión de la política (nunca se cierra en silencio).
-- **La correlación encuentra 12/12 incidentes, pero parte dos en piezas:** Logisoft (la VPN robada y el túnel DNS
-  desde WMS01 no comparten ninguna entidad; la relación "Logisoft solo accede a WMS01" es conocimiento de negocio) y
-  la tienda T07 (AnyDesk en el portátil y el RAM scraping en los TPV no comparten IOC). Un analista las une; el código no.
-- **1 incidente falso de 14** (dos alertas de ruido del mismo usuario en 2 días).
+- **La correlación encuentra 12/12 incidentes y ya no parte Logisoft ni T07** (`derived_keys` en
+  `soc/correlate/incidents.py`): la VPN se une al túnel DNS porque su sesión hace RDP a WMS01 (FW-0026536), y el
+  AnyDesk del portátil al RAM scraping de los TPV porque están en la misma tienda según la CMDB. Lo que no hace: usar
+  conocimiento de negocio que no esté en los datos. El incidente de Logisoft arrastra 3 conexiones VPN de la misma
+  cuenta a las 18 h (fin de su ventana contractual), que ya se unían antes por cuenta e IP.
+- **1 incidente falso de 13** (dos alertas de ruido del mismo usuario en 2 días).
 - **Señuelos con lista fija:** los servicios DNS legítimos (ESET, McAfee, Spamhaus, Sophos) e infraestructura (DCs,
   NESSUS01, pentest) están en una lista en el código. En otra empresa habría que mantenerla.
 - **La cuenta de nuria.vidal sigue activa** con actividad en su puesto después de su último día (16/10): lo vemos,

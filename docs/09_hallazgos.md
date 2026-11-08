@@ -106,6 +106,12 @@ Revisión de tickets reales contra `politica_soc.md`, RB-01/03/05/09 y el PowerP
 | INC-11 | critical | 5 | T07: AnyDesk desde Marruecos → RAM scraping en 3 TPV (descripción con SEC-2210 falso) → beaconing |
 | INC-12 | high | 13 | Campaña Packaging Iberia con prompt injection oculta; lucia.castro pierde la sesión (AiTM) |
 
+**Correlación de fases sin entidades en común (Marc, 8/11 04:00):** las alertas de VPN de Logisoft llevan en
+`related_events` el evento del firewall que hace RDP a 10.40.2.10 (WMS01), y el túnel DNS sale de WMS01 49 min
+después; el portátil LT-T07-02 y los TPV POS-T07-0x comparten `location` en la CMDB (8 días entre el AnyDesk y el
+RAM scraping). Con esas dos claves derivadas: INC-07 pasa de 12/18 a **18/18**, INC-11 de 4/5 a **5/5**, siguen 12/12
+y el falso sigue siendo 1 (de 13).
+
 **Señuelos (todos con cambio, viaje o flujo aprobado que encaja en origen, cuenta, ventana y alcance):** pentest
 CHG-1042 (20), Nessus los miércoles (19), PsExec de adm.dnavarro en CHG-1057 (4), viaje de ricard.castells (1),
 nóminas FLUJO-0007 (2), OT vía JUMP01 en CHG-1063 (1), Backup Operators CHG-1078 (1), EDR parado en CHG-1080 (6),

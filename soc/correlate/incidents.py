@@ -56,6 +56,10 @@ TACTICS = ["Reconnaissance", "Resource Development", "Initial Access", "Executio
            "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement",
            "Collection", "Command and Control", "Exfiltration", "Impact"]
 CLOSED_VERDICTS = {"false_positive", "benign_true_positive"}
+# Vínculo por tienda (derived_keys): solo en la zona de tiendas, donde una sede tiene pocos equipos. Va con la ventana
+# larga porque en T07 pasan 8 días entre el AnyDesk del portátil (12/10) y el RAM scraping de los TPV (20/10).
+STORE_ZONE = "STORES"
+SITE_PREFIX = "sede:"
 
 
 # ----------------------------------------------------------------------------- utilidades
@@ -82,7 +86,32 @@ def alert_keys(alert: dict, store) -> set[str]:
     for mid in store.entities_of(alert).get("message_ids") or []:
         if "@" in mid:
             keys.add(mid.rsplit("@", 1)[1].strip("<> ").lower())
+    return keys | derived_keys(alert, store)
+
+
+def derived_keys(alert: dict, store) -> set[str]:
+    """Claves que no vienen en la alerta pero sí en los datos, para unir fases que no comparten ninguna entidad.
+
+    - Destino de la sesión: el equipo interno al que llegan los eventos de la alerta. Una VPN robada que hace RDP a
+      WMS01 (FW-0026536) queda unida al túnel DNS que sale después desde WMS01 (INC-07, Logisoft).
+    - Tienda: los activos de una tienda comparten sede en la CMDB. El AnyDesk de un portátil queda unido al RAM
+      scraping de los TPV de la misma tienda días después (INC-11, T07).
+    """
+    keys = set()
+    for event_id in alert.get("related_events") or []:
+        dst = (store.event(event_id) or {}).get("dst_ip")
+        asset = store.asset(dst) if dst and is_weak(dst) else None     # solo destinos internos de la CMDB
+        if asset and asset.get("hostname"):
+            keys.add(asset["hostname"].lower())
+    for host in store.entities_of(alert).get("hosts") or []:
+        asset = store.asset(host) or {}
+        if asset.get("zone") == STORE_ZONE and asset.get("location"):
+            keys.add(SITE_PREFIX + asset["location"].lower())
     return keys
+
+
+def is_site(key: str) -> bool:
+    return key.startswith(SITE_PREFIX)
 
 
 def is_weak(key: str) -> bool:
@@ -170,7 +199,8 @@ def _is_significant(inc: dict, alerts: dict, ticket_of: dict, rule_count: collec
     rare = sorted({alerts[a]["rule_id"] for a in inc["alert_ids"] if rule_count[alerts[a]["rule_id"]] <= RARE_RULE_MAX})
     if rare:
         why.append("regla poco frecuente: " + ", ".join(rare))
-    strong = [k for k in inc["linking_entities"] if not is_weak(k)]
+    # Compartir tienda une fases, pero no hace sospechoso un grupo por sí solo: no cuenta como IOC repetido
+    strong = [k for k in inc["linking_entities"] if not is_weak(k) and not is_site(k)]
     if strong and len(inc["alert_ids"]) >= STRONG_MIN_ALERTS:
         why.append("IOC externo repetido: " + ", ".join(strong[:3]))
     tp_high = [a for a in inc["alert_ids"] if (t := ticket_of.get(a)) and t.get("verdict") == "true_positive"

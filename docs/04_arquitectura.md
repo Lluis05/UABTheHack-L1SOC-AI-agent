@@ -276,7 +276,8 @@ from soc.correlate.incidents import correlate, attach
 incidents = correlate(alerts, store, tickets=tickets)   # alertas NO cerradas → [Incident] del más grave al menos
 inc_id = attach(alert, incidents, store)                 # en vivo: incidente al que se une (→ x_incident_id) o None
 ```
-Campos extra: `linking_entities` (qué une las alertas), `x_why` (por qué es incidente y no ruido), `x_chain` y
+Campos extra: `linking_entities` (qué une las alertas; además de entidades de la alerta puede incluir claves
+derivadas de los datos: el equipo interno al que llega la sesión, p. ej. `wms01`, o la tienda, `sede:tienda 07 …`), `x_why` (por qué es incidente y no ruido), `x_chain` y
 `x_tactics` (cadena de ≥ 2 fases → severidad +1, política §5). CLI: `python -m soc.correlate.incidents [--truth]`
 (usa `output/tickets_all_nollm.jsonl` de `python -m soc.pipeline --all --no-llm --out output/tickets_all_nollm.jsonl`).
 

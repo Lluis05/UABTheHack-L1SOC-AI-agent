@@ -66,7 +66,8 @@ Detalle completo y contratos entre módulos en [`docs/04_arquitectura.md`](docs/
 - **Prompt injection:** **6/6** inyecciones detectadas y **0** veredictos cambiados, con 0 falsas detecciones en el
   control. Incluye un caso real del dataset (`ALR-20261020-011905`, factura falsa con texto oculto que pide marcarla como
   false_positive).
-- **Correlación:** encuentra los **12/12** incidentes de nuestra verdad de threat hunting (`eval/incidents_truth.jsonl`).
+- **Correlación:** encuentra los **12/12** incidentes de nuestra verdad de threat hunting (`eval/incidents_truth.jsonl`),
+  con todas sus alertas, incluidos los de varias fases sin entidades en común (Logisoft 18/18 y tienda T07 5/5).
 - **OSINT** (opcional): con las listas públicas ya cargadas añade unos milisegundos por alerta; en el simulacro encontró
   la IP de la VPN de Logisoft y la del C2 del minero de Jenkins en 8 listas negras de IPsum.
 - **Tests:** 184 tests en Python (`pytest`) y tests del frontend (`vitest`). Ningún test puede gastar cuota del LLM.
@@ -87,8 +88,9 @@ Resumen; la lista completa, con datos, está en [`docs/08_demo_y_pitch.md`](docs
   datos…): necesitan el LLM o una persona.
 - **Gemini gratis no aguanta la defensa si Claude se cae** (5 peticiones/min). Las alertas sin IA salen marcadas
   `[SIN IA]` con la decisión de la política.
-- **La correlación parte dos incidentes en piezas** cuando las fases no comparten ninguna entidad (Logisoft y la
-  tienda T07). Un analista las une; el código no. Genera además 1 incidente falso de 14.
+- **La correlación solo une lo que conecta un dato.** Une fases sin entidades en común si los datos las enlazan
+  (destino de la sesión en el firewall, misma tienda en la CMDB: así salen enteros Logisoft y la tienda T07), pero
+  no usa conocimiento de negocio que no esté en los datos. Genera además 1 incidente falso de 13.
 - **OSINT limitado:** además del TIP interno, GeoIP y el sandbox, consultamos listas públicas de reputación (Tor,
   IPsum, C2IntelFeeds) y ThreatFox (con clave), hasta 3 indicadores por alerta. No consultamos VirusTotal ni AbuseIPDB,
   y viene desactivado por defecto (`OSINT_ENABLED=1`).

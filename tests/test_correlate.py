@@ -3,7 +3,7 @@ import copy
 import json
 from pathlib import Path
 
-from soc.correlate.incidents import attach, correlate, is_hub, is_weak, match_truth
+from soc.correlate.incidents import attach, correlate, derived_keys, is_hub, is_site, is_weak, match_truth
 from soc.data.store import get_store
 
 TRUTH = Path(__file__).resolve().parents[1] / "eval" / "incidents_truth.jsonl"
@@ -59,3 +59,20 @@ def test_attach_new_alert_to_existing_incident():
     unrelated = copy.deepcopy(s.alert("ALR-20261006-011826"))       # minero de Jenkins
     unrelated["alert_id"] = "ALR-NEW-0002"
     assert attach(unrelated, incs, s) is None
+
+
+def test_derived_keys_session_destination_and_store():
+    s = get_store()
+    vpn = s.alert("ALR-20261011-011877")                             # VPN de Logisoft: su FW-0026536 va a WMS01
+    assert "wms01" in derived_keys(vpn, s)
+    laptop = s.alert("ALR-20261012-011829")                          # AnyDesk en LT-T07-02
+    pos = s.alert("ALR-20261020-011897")                             # RAM scraping en POS-T07-01
+    site = {k for k in derived_keys(laptop, s) if is_site(k)}
+    assert site and site == {k for k in derived_keys(pos, s) if is_site(k)}
+
+
+def test_phases_without_shared_entities_join_through_the_data():
+    t = truth()
+    for inc_id in ("INC-07", "INC-11"):                              # Logisoft y tienda T07
+        incs = correlate(alerts(t[inc_id]["alert_ids"]), get_store())
+        assert len(incs) == 1 and set(incs[0]["alert_ids"]) == set(t[inc_id]["alert_ids"]), inc_id
