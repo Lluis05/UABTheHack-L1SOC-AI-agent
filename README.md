@@ -198,3 +198,4 @@ arquitectura y los contratos, el setup, la capa LLM, la demo y los hallazgos del
 
 *Proyecto desarrollado para **UAB The Hack 2026** con el reto propuesto por **Deloitte**. Empresa, personas y
 datos de Tarvia Group son ficticios.*
+ 
