@@ -65,6 +65,9 @@ button { font: inherit; color: inherit; }
 }
 .slide--center { justify-content: center; }
 .slide--pipeline { gap: 16px; padding-top: clamp(18px, 3vh, 32px); }
+.slide--video { gap: 12px; padding-top: clamp(16px, 3vh, 28px); }
+.video { --video-room: calc(100vh - var(--nav-height) - 140px); width: min(100%, calc(var(--video-room) * 16 / 9)); aspect-ratio: 16 / 9; margin: 0 auto; object-fit: contain; border-radius: 12px; background: #000; display: block; }
+.video--missing { display: grid; place-items: center; gap: 16px; padding: 48px 16px; border: 1px dashed var(--line); background: transparent; text-align: center; }
 .slide__kicker { color: var(--muted); margin: 0; }
 .slide__title { font-size: clamp(28px, 3vw, 48px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
 

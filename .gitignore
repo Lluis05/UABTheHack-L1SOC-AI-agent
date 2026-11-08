@@ -12,3 +12,4 @@ data/cache/
 node_modules/
 dashboard/web/dist/
 presentacio/dist/
+presentacio/public/demo.mp4

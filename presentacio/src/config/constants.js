@@ -78,6 +78,13 @@ export const LEVELS = [
 ]
 export const LEVEL_STATES = { done: 'hecho', partial: 'parcial' }
 
+// Vídeo de la demo: va en public/ (se copia junto a dist/index.html) y no se versiona por su tamaño.
+export const DEMO_VIDEO = {
+  src: './demo.mp4',
+  title: 'Demo del analista N1 con IA',
+  driveUrl: 'https://drive.google.com/file/d/1BgI5sqKoFhDQWTVQGeqrcEWuOSDYHbWw/view?usp=sharing',
+}
+
 // Limitaciones. Fuente: README.md, «Lo que no resolvemos».
 export const LIMITS = [
   'Necesita decisión humana: la contención y lo escalado siempre los aprueba una persona; el sistema propone, no actúa solo.',

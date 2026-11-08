@@ -110,6 +110,7 @@ describe('navegación', () => {
 
   it('no captura teclas mientras se escribe y lee el hash', () => {
     expect(isTypingTarget({ tagName: 'INPUT' })).toBe(true)
+    expect(isTypingTarget({ tagName: 'VIDEO' })).toBe(true)
     expect(indexFromHash('#3', 4)).toBe(2)
     expect(indexFromHash('', 4)).toBe(0)
   })

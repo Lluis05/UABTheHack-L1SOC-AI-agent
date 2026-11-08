@@ -1,4 +1,5 @@
 // Componentes base: las piezas mínimas con nuestros estilos. Las pantallas y los compuestos usan solo estos.
+import { useState } from 'react'
 import { ACTORS } from '../../config/constants'
 
 export function Slide({ title, kicker, align = 'top', variant, children }) {
@@ -45,4 +46,21 @@ export function Button({ variant = 'default', href, children, ...props }) {
   const className = `btn${variant === 'default' ? '' : ` btn--${variant}`}`
   if (href) return <a className={className} href={href} target="_blank" rel="noreferrer" {...props}>{children}</a>
   return <button type="button" className={className} {...props}>{children}</button>
+}
+
+/** Vídeo local junto a index.html. Si el fichero no está (no se versiona), enlaza a la copia en la nube. */
+export function Video({ src, title, fallbackHref }) {
+  const [missing, setMissing] = useState(false)
+  if (missing) {
+    return (
+      <div className="video video--missing">
+        <p>No está el fichero <Mono>{src}</Mono> junto a la presentación.</p>
+        <Button variant="primary" href={fallbackHref}>Ver el vídeo</Button>
+      </div>
+    )
+  }
+  return (
+    <video className="video" src={src} title={title} controls playsInline preload="metadata"
+      onError={() => setMissing(true)} />
+  )
 }

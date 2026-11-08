@@ -18,10 +18,10 @@ export function keyToMove(key, count) {
   return null
 }
 
-/** No robamos las flechas cuando la persona escribe o usa un control que ya las usa. */
+/** No robamos las flechas cuando la persona escribe o usa un control que ya las usa (el vídeo: espacio y flechas). */
 export function isTypingTarget(target) {
   const tag = target?.tagName
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(target?.isContentEditable)
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'VIDEO' || Boolean(target?.isContentEditable)
 }
 
 /** «#3» → 2. Así se puede compartir el enlace a una diapositiva concreta. */

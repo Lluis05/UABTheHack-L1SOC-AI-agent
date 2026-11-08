@@ -1,8 +1,16 @@
 // Las diapositivas (3 minutos). Solo componen componentes base y compuestos; el contenido vive en config/.
-import { ActorTag, Button, Slide } from '../components/base'
+import { ActorTag, Button, Slide, Video } from '../components/base'
 import { PipelineExplorer } from '../components/shared/PipelineExplorer'
 import cases from '../data/casos.json'
-import { LEVEL_STATES, LEVELS, LIMITS, LIVE_DASHBOARD_URL, PROBLEM_LINE, RESULTS } from '../config/constants'
+import { DEMO_VIDEO, LEVEL_STATES, LEVELS, LIMITS, LIVE_DASHBOARD_URL, PROBLEM_LINE, RESULTS } from '../config/constants'
+
+function Demo() {
+  return (
+    <Slide variant="video" title="Demo">
+      <Video src={DEMO_VIDEO.src} title={DEMO_VIDEO.title} fallbackHref={DEMO_VIDEO.driveUrl} />
+    </Slide>
+  )
+}
 
 function Cover() {
   return (
@@ -64,6 +72,7 @@ function Closing() {
 }
 
 export const SLIDES = [
+  { id: 'demo', title: 'Vídeo de la demo', Component: Demo },
   { id: 'portada', title: 'Portada', Component: Cover },
   { id: 'pipeline', title: 'El pipeline', Component: Pipeline },
   { id: 'resultados', title: 'Resultados', Component: Results },
