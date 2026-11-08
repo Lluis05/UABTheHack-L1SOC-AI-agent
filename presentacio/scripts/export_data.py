@@ -20,14 +20,11 @@ OUTPUT = ROOT / "output"
 DEST = ROOT / "presentacio" / "src" / "data" / "casos.json"
 TICKET_FILES = ("tickets_sim_incidentes.jsonl", "tickets.jsonl")
 
-# Casos de la presentación: un ataque real, un falso positivo y una inyección de prompt.
+# Caso de la presentación: el mismo del vídeo de la demo (BEC tras AiTM, triado en directo con IA y revisor).
+# Admite varios casos: con más de uno, la diapositiva muestra pestañas para elegir.
 CASES = [
-    {"key": "minero", "alert_id": "ALR-20261006-011825", "label": "Minero en Jenkins",
-     "kind": "Ataque real"},
-    {"key": "sccm", "alert_id": "ALR-20261020-005954", "label": "PowerShell de SCCM",
-     "kind": "Falso positivo"},
-    {"key": "factura", "alert_id": "ALR-20261020-011912", "label": "Factura falsa",
-     "kind": "Phishing con inyección"},
+    {"key": "bec", "alert_id": "ALR-20261008-011789", "label": "Cambio de IBAN a Lituania",
+     "kind": "Fraude BEC tras AiTM"},
 ]
 
 MAX_TEXT = 420

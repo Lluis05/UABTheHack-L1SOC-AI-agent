@@ -8,7 +8,7 @@ construido»; la demo en directo de las 10 alertas se hace en el dashboard.
 1. Portada (lema y el problema en una línea) · **2. El pipeline interactivo** · 3. Resultados medidos y niveles del
 reto · 4. Lo que no resolvemos y enlace a la demo en directo.
 
-En la diapositiva 2 se elige uno de tres casos reales (ataque, falso positivo y phishing con inyección) y se recorren
+En la diapositiva 2 se recorre un caso real, el mismo del vídeo de la demo (BEC: cambio de IBAN tras AiTM). Se recorren
 las 7 etapas sobre un recorrido de nodos con el color de quién decide (mismo código que el dashboard). Cada etapa
 tiene su propia vista: la alerta y sus entidades, el contexto por fuente, la reputación de cada indicador, la ecuación
 regla × activo = severidad, el veredicto de la IA con su confianza y sus event_id, el incidente correlacionado y las
@@ -28,7 +28,7 @@ npm test             # tests de la lógica (vitest)
 ## Datos
 `src/data/casos.json` sale de las trazas y tickets reales de `output/` (que no se versionan):
 ```bash
-python -m soc.pipeline --ids ALR-20261006-011825,ALR-20261020-005954,ALR-20261020-011912 --live
+python -m soc.pipeline --ids ALR-20261008-011789 --live    # o triarlo desde el dashboard
 python presentacio/scripts/export_data.py
 ```
 El script no copia los textos que escribe el atacante (cuerpos de correo, prompts): de esos casos se enseña lo que

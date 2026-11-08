@@ -6,6 +6,18 @@ import { cumulativeMs, formatMs, groupTrace, totalMs } from '../../utils/trace'
 import { ACTORS, FALLBACK_STAGE, PLAY_STAGE_MS, STAGES } from '../../config/constants'
 
 function CaseTabs({ cases, selected, onSelect }) {
+  if (cases.length === 1) {
+    // Un solo caso: se presenta como título, sin pestañas que elegir
+    const [only] = cases
+    return (
+      <div className="cases">
+        <div className="case-tab" aria-current="true">
+          <span className="case-tab__name">{only.label}</span>
+          <span className="case-tab__kind">{only.kind}</span>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="cases" role="tablist" aria-label="Caso real">
       {cases.map(c => (

@@ -27,13 +27,13 @@ Web interactiva en [`presentacio/`](../presentacio/README.md) (`npm run build` �
 servidor ni red). Cuatro diapositivas; el peso está en la segunda:
 1. **Portada (15 s):** «La IA investiga · la política decide la severidad · la persona aprueba la contención». El
    problema va en una sola línea, sin detenerse.
-2. **El pipeline (1 min 45 s):** se elige un caso real (minero en Jenkins, PowerShell de SCCM o factura falsa con
-   inyección) y se pulsa «Reproducir triaje». Recorre las 7 etapas con el color de quién decide: entrada, contexto,
+2. **El pipeline (1 min 45 s):** un único caso real, el mismo del vídeo de la demo: el cambio de IBAN a Lituania
+   (BEC tras AiTM, `ALR-20261008-011789`, 148.320 €), triado en directo con IA y revisor. Se pulsa «Reproducir triaje». Recorre las 7 etapas con el color de quién decide: entrada, contexto,
    inteligencia, política (regla × activo = severidad), IA + revisor, correlación y persona.
    - **IA + revisor:** la IA propone el veredicto con evidencias citadas por `event_id`. El código elimina las
      evidencias con un `event_id` que no existe y baja la confianza; si el caso es grave (TP high/critical) o dudoso
      (confianza < 0,6), un segundo LLM busca errores. El revisor no cambia el veredicto: si discrepa, baja la confianza,
-     deja la pregunta abierta y el ticket no se cierra solo. Por eso el minero hace 2 llamadas y SCCM solo 1.
+     deja la pregunta abierta y el ticket no se cierra solo. Por eso el BEC (TP high) hace 2 llamadas.
    - Frase para el jurado: *«Una IA propone, el código comprueba que las pruebas existen y, en lo grave, una segunda IA
      busca errores. Si discrepan, decide una persona.»*
 3. **Resultados (40 s):** cifras medidas y niveles del reto.
