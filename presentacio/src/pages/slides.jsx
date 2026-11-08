@@ -52,7 +52,7 @@ function Results() {
 
 function Closing() {
   return (
-    <Slide title="Lo que no resolvemos">
+    <Slide title="Limitaciones">
       <ul className="limits">
         {LIMITS.map(limit => <li key={limit}>{limit}</li>)}
       </ul>
@@ -67,5 +67,5 @@ export const SLIDES = [
   { id: 'portada', title: 'Portada', Component: Cover },
   { id: 'pipeline', title: 'El pipeline', Component: Pipeline },
   { id: 'resultados', title: 'Resultados', Component: Results },
-  { id: 'cierre', title: 'Lo que no resolvemos', Component: Closing },
+  { id: 'cierre', title: 'Limitaciones', Component: Closing },
 ]

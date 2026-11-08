@@ -6,7 +6,7 @@ construido»; la demo en directo de las 10 alertas se hace en el dashboard.
 
 ## Diapositivas (3 minutos)
 1. Portada (lema y el problema en una línea) · **2. El pipeline interactivo** · 3. Resultados medidos y niveles del
-reto · 4. Lo que no resolvemos y enlace a la demo en directo.
+reto · 4. Limitaciones (entre ellas, que necesita decisión humana) y enlace a la demo en directo.
 
 En la diapositiva 2 se recorre un caso real, el mismo del vídeo de la demo (BEC: cambio de IBAN tras AiTM). Se recorren
 las 7 etapas sobre un recorrido de nodos con el color de quién decide (mismo código que el dashboard). Cada etapa

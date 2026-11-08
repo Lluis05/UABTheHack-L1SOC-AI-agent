@@ -78,7 +78,8 @@ export const LEVELS = [
 ]
 export const LEVEL_STATES = { done: 'hecho', partial: 'parcial' }
 
-// Fuente: README.md, «Lo que no resolvemos».
+// Limitaciones. Fuente: README.md, «Lo que no resolvemos».
 export const LIMITS = [
+  'Necesita decisión humana: la contención y lo escalado siempre los aprueba una persona; el sistema propone, no actúa solo.',
   'Sin IA, 49 de 83 alertas de ataque quedan pendientes: nunca se cierran en silencio, pero necesitan IA o persona.',
 ]
