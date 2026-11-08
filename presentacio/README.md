@@ -4,17 +4,17 @@ Web de presentación para la defensa: explica cómo funciona nuestro agente N1 p
 del pipeline (no con datos inventados). Es el apoyo del punto «hasta qué nivel habéis llegado y cómo lo habéis
 construido»; la demo en directo de las 10 alertas se hace en el dashboard.
 
-## Diapositivas
-1. Portada · 2. El problema · 3. Quién decide qué (Política / IA / Persona) · **4. El pipeline interactivo** ·
-5. Seguridad (inyección de prompt) · 6. Resultados medidos · 7. Niveles del reto · 8. Lo que no resolvemos ·
-9. Enlace a la demo en directo.
+## Diapositivas (3 minutos)
+1. Portada (lema y el problema en una línea) · **2. El pipeline interactivo** · 3. Resultados medidos y niveles del
+reto · 4. Lo que no resolvemos y enlace a la demo en directo.
 
-En la diapositiva 4 se elige uno de tres casos reales (ataque, falso positivo y phishing con inyección) y se recorren
-las 7 etapas: qué hace cada una, quién decide (mismo código de colores que el dashboard), las consultas reales que hizo
-con su tiempo (botón «Reproducir consultas») y lo que produjo: la matriz de severidad, el veredicto con sus event_id,
-las acciones y quién debe aprobarlas.
+En la diapositiva 2 se elige uno de tres casos reales (ataque, falso positivo y phishing con inyección) y se recorren
+las 7 etapas sobre un recorrido de nodos con el color de quién decide (mismo código que el dashboard). Cada etapa
+tiene su propia vista: la alerta y sus entidades, el contexto por fuente, la reputación de cada indicador, la ecuación
+regla × activo = severidad, el veredicto de la IA con su confianza y sus event_id, el incidente correlacionado y las
+acciones con quién debe aprobarlas. «Reproducir triaje» recorre las etapas solo, con el tiempo acumulado real.
 
-Navegación: flechas, espacio, Re Pág/Av Pág, Inicio/Fin o la barra inferior. La URL guarda la diapositiva (`#4`).
+Navegación: flechas, espacio, Re Pág/Av Pág, Inicio/Fin o la barra inferior. La URL guarda la diapositiva (`#2`).
 
 ## Uso
 ```bash
@@ -35,9 +35,9 @@ El script no copia los textos que escribe el atacante (cuerpos de correo, prompt
 concluyó nuestro sistema. Las cifras de las diapositivas están en `src/config/constants.js`, con su fuente.
 
 ## Estructura
-- `src/components/base`: piezas mínimas (diapositiva, etiqueta de actor, severidad, botón, panel).
-- `src/components/shared`: bloques compuestos (explorador del pipeline, traza, navegación).
-- `src/components/reactbits`: componentes de [React Bits](https://reactbits.dev) copiados tal cual (BlurText,
-  CountUp, DecryptedText, SpotlightCard; licencia MIT + Commons Clause en `LICENSE.md`).
+- `src/components/base`: piezas mínimas (diapositiva, etiqueta de actor, severidad, chip, botón).
+- `src/components/shared`: bloques compuestos (explorador del pipeline, vista de cada etapa, navegación).
 - `src/pages/slides.jsx`: las diapositivas, que solo componen lo anterior.
 - `src/utils`, `src/hooks`, `src/config`: lógica pura con tests, hooks y constantes.
+
+Sin librerías de animación: las transiciones son CSS y respetan `prefers-reduced-motion`.
