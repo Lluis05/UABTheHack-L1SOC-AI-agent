@@ -8,7 +8,7 @@ import { alertElapsedSeconds, buildTriageRequest, parseAlerts, parseIds, stepSta
 import { countLabel, formatDateTime, formatPercent, initials, toPercent } from './format.js'
 import { chipProps, optionsFor } from './chips.js'
 import { buildSearch, readUrlState } from './url.js'
-import { incidentEntities, incidentTactics } from './incidents.js'
+import { incidentEntities, incidentTactics, reportFileName, reportFlags } from './incidents.js'
 
 const CONFIG = { api_actions: ['isolate_host', 'block_ioc'] }
 const rule = (allowed, requires_approval, approvers = []) => ({ allowed, requires_approval, approvers })
@@ -164,5 +164,18 @@ describe('listas para cerrar', () => {
     expect(pendingCloseCount(tickets)).toBe(1)
     expect(queueTickets(tickets, { ...EMPTY_FILTERS, pendingClose: 'yes' }).map((t) => t.ticket_id)).toEqual(['A'])
     expect(activeFilterCount({ ...EMPTY_FILTERS, pendingClose: 'yes' })).toBe(1)
+  })
+})
+
+describe('informe de investigación', () => {
+  it('avisa de lo que el N2 debe saber antes de leerlo, por gravedad', () => {
+    expect(reportFlags(null)).toEqual([])
+    expect(reportFlags({ confidence: 0.8 })).toEqual([])
+    const flags = reportFlags({ x_stale: true, injection_detected: true, x_no_ai: true })
+    expect(flags.map((f) => f.key)).toEqual(['stale', 'injection', 'no_ai'])
+  })
+  it('nombra el fichero con el incidente', () => {
+    expect(reportFileName({ incident_id: 'INC-0004' })).toBe('informe_INC-0004.json')
+    expect(reportFileName(null)).toBe('informe_incidente.json')
   })
 })

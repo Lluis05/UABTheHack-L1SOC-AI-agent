@@ -16,6 +16,7 @@ BATCH_METRICS_FILE = "metrics.json"
 DECISIONS_FILE = OUTPUT_DIR / "human_decisions.jsonl"
 LIVE_INPUT_DIR = OUTPUT_DIR / "live_input"
 TRACES_DIR = "traces"
+REPORTS_DIR = "reports"     # informes de investigación de nivel 3 (output/reports/<incident_id>.json)
 
 SOC_API_URL = config.SOC_API_URL.rstrip("/")
 SOC_API_TIMEOUT_S = 10

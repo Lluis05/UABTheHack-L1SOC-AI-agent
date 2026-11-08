@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from dashboard import chat
 from dashboard import containment
 from dashboard import policy
+from dashboard import reports
 from dashboard import settings as s
 from dashboard.live import JobManager, detect_mode
 from dashboard.results import ResultsStore, compute_metrics
@@ -77,9 +78,48 @@ def get_trace(ticket_id: str) -> dict:
     return store.trace(_ticket_or_404(ticket_id))
 
 
+def _report_dirs() -> list:
+    return list(dict.fromkeys([s.OUTPUT_DIR, store.data_dir]))
+
+
+def _incident_or_404(incident_id: str) -> dict:
+    incident = next((i for i in store.incidents() if i.get("incident_id") == incident_id), None)
+    if not incident:
+        raise HTTPException(404, f"incidente no encontrado: {incident_id}")
+    return incident
+
+
 @app.get("/api/incidents")
 def list_incidents() -> dict:
-    return {"source": store.source, "incidents": store.incidents()}
+    """Incidentes con x_has_report: si ya tienen informe de investigación para N2."""
+    incidents = store.incidents()
+    for inc in incidents:
+        try:
+            inc["x_has_report"] = reports.load(inc, _report_dirs()) is not None
+        except reports.ReportError:
+            inc["x_has_report"] = False
+    return {"source": store.source, "incidents": incidents}
+
+
+@app.get("/api/incidents/{incident_id}/report")
+def get_report(incident_id: str) -> dict:
+    """Informe de investigación (nivel 3) del incidente, o null si aún no se ha generado."""
+    incident = _incident_or_404(incident_id)
+    try:
+        return {"report": reports.load(incident, _report_dirs()), "generating": reports.generating(incident_id)}
+    except reports.ReportError as e:
+        raise HTTPException(e.status, e.detail) from e
+
+
+@app.post("/api/incidents/{incident_id}/report")
+def create_report(incident_id: str, fresh: bool = False) -> dict:
+    """Clic humano: la IA redacta el informe y el código lo valida (event_id existentes, aprobadores de la política).
+    Solo propone: la contención la sigue aprobando una persona. Tarda lo que una llamada al LLM (≈1-2 min)."""
+    incident = _incident_or_404(incident_id)
+    try:
+        return {"report": reports.generate(incident, s.OUTPUT_DIR, datastore.get(), fresh=fresh), "generating": False}
+    except reports.ReportError as e:
+        raise HTTPException(e.status, e.detail) from e
 
 
 @app.get("/api/metrics")

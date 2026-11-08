@@ -51,7 +51,7 @@ Detalle completo y contratos entre módulos en [`docs/04_arquitectura.md`](docs/
 |---|---|---|
 | **1 · Triaje básico** | ✅ | Ticket por alerta con el esquema oficial (`ticket_salida.schema.json`): veredicto, confianza, severidad razonada, evidencias con `event_id`, enriquecimiento, MITRE, acciones, escalado y preguntas abiertas. |
 | **2 · Triaje con criterio** | ✅ | Matriz de severidad con la criticidad real del activo, descarte argumentado de lo autorizado (SCCM, pentest, Nessus, Terraform, flujos de nóminas…), deduplicación y correlación en incidentes. |
-| **3 · Investigación** | 🟡 | Reconstrucción de la cadena de ataque entre días, e informe con el esquema `informe_incidente.schema.json` (`soc/correlate/investigate.py`). Hay un informe generado de ejemplo ([`docs/anexos/informe_INC-0004.json`](docs/anexos/informe_INC-0004.json)); el dashboard muestra los incidentes, pero todavía no el informe completo. |
+| **3 · Investigación** | ✅ | Reconstrucción de la cadena de ataque entre días e informe para N2 con el esquema `informe_incidente.schema.json` (`soc/correlate/investigate.py`): paciente cero, acceso inicial, cronología con `event_id` validados, alcance, causa raíz, plan de contención con sus aprobadores, erradicación, notificaciones y huecos de detección. En el dashboard: **Incidentes → Informe N2**, con un botón para generarlo (≈30-70 s) y descargarlo en JSON. Ejemplo: [`docs/anexos/informe_INC-0004.json`](docs/anexos/informe_INC-0004.json). |
 | **4 · Respuesta** | ✅ | Acciones de contención propuestas con su aprobador según la política; se ejecutan contra la API simulada solo tras la aprobación humana (`approval_token`) y quedan en el registro. |
 
 ## 📊 Resultados medidos

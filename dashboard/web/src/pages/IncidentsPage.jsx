@@ -34,7 +34,7 @@ export default function IncidentsPage({ incidents, tickets, onOpenTicket }) {
       {incident ? (
         <AppSplit layout={layout} onLayoutChange={updateLayout} limits={PANE_LIMITS} leftLabel="Lista de incidentes"
                   left={list('column')}
-                  right={<IncidentDetail incident={incident} knownTickets={knownTickets} onOpenTicket={onOpenTicket}
+                  right={<IncidentDetail key={incident.incident_id} incident={incident} knownTickets={knownTickets} onOpenTicket={onOpenTicket}
                                          onClose={() => setSelectedId(null)} />} />
       ) : list('grid')}
     </AppStack>

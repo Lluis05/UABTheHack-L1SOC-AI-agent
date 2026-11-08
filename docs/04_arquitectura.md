@@ -303,6 +303,18 @@ cronología se validan contra la evidencia y `containment_plan[].approver` lo de
 informe mínimo con `x_no_ai: true`. CLI: `python -m soc.correlate.investigate --top 3` guarda cada informe en
 `output/reports/<INC>.json` y en `x_report` del incidente en `output/incidents.jsonl` (lo lee el dashboard).
 
+**Informe N2 en el dashboard ✅ (`dashboard/reports.py`, pestaña «Informe N2» del incidente):**
+```http
+GET  /api/incidents                         → cada incidente lleva x_has_report
+GET  /api/incidents/{incident_id}/report    → 200 {"report": Report|null, "generating": bool} · 404 incidente
+POST /api/incidents/{incident_id}/report?fresh=bool
+     → 200 {"report": Report, "generating": false} · 404 incidente · 409 ya se está generando
+```
+- Lee `output/reports/<incident_id>.json` (y, en modo muestra, `dashboard/sample/reports/`); si no, `x_report` del incidente.
+- `x_stale: true` si el informe tiene otras alertas que el incidente actual (la correlación se volvió a ejecutar).
+- El POST es un clic humano: llama a `investigate()` (caché del LLM salvo `fresh=true`) y guarda el fichero. El
+  informe solo **propone** la contención; las acciones se aprueban y ejecutan desde el ticket, como siempre.
+
 ## Modo defensa en directo (REQUISITO DE DISEÑO PRINCIPAL)
 En la defensa nos dan **10 alertas al azar** y el sistema las tiene que triar **en directo**, delante del jurado.
 No vale tener nada precalculado: el triaje con IA se hace en el momento. Consecuencias:

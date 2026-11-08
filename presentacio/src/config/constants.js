@@ -73,7 +73,7 @@ export const RESULTS = [
 export const LEVELS = [
   { n: 1, title: 'Triaje básico', state: 'done' },
   { n: 2, title: 'Con criterio', state: 'done' },
-  { n: 3, title: 'Investigación', state: 'partial' },
+  { n: 3, title: 'Investigación', state: 'done' },
   { n: 4, title: 'Respuesta', state: 'done' },
 ]
 export const LEVEL_STATES = { done: 'hecho', partial: 'parcial' }
@@ -82,5 +82,5 @@ export const LEVEL_STATES = { done: 'hecho', partial: 'parcial' }
 export const LIMITS = [
   'Sin IA, 49 de 83 alertas de ataque quedan pendientes: nunca se cierran en silencio, pero necesitan IA o persona.',
   'Si Claude cae, Gemini gratis solo da 5 peticiones por minuto.',
-  'El informe de investigación (nivel 3) se genera, pero el dashboard aún no lo enseña.',
+  'La correlación solo une lo que conecta un dato: genera 1 incidente falso de 13.',
 ]

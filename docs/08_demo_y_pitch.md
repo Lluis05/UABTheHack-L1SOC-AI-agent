@@ -50,6 +50,8 @@ Las cifras de la presentación están en `presentacio/src/config/constants.js`; 
 4. **Un benigno autorizado (30 s):** WAF disparado por el pentest (CHG-2026-1042, IPs 192.0.2.10-12).
 5. **Un incidente real (2 min):** varias alertas de días distintos agrupadas en un incidente, con la cadena de
    ataque, la severidad calculada con la matriz y la escalada a N2.
+   Pestaña **Informe N2** del incidente: el informe de nivel 3 (paciente cero, cronología con `event_id`, alcance,
+   plan de contención con aprobadores). INC-0004 ya lo tiene; para otro, «Generar informe» (≈30-70 s con Claude).
 6. **Intervención humana (1 min):** aprobar `revoke_sessions` y ver cómo se registra en la API con el token de aprobación.
 7. **Prompt injection (30 s):** una alerta con instrucciones del atacante que se detectan y no se obedecen.
    - **Caso real del dataset (el mejor):** `ALR-20261020-011905`, factura falsa de `packaging-iberia-pagos.example` con un

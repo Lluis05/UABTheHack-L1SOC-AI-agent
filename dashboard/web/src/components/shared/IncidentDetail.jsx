@@ -1,9 +1,12 @@
-import { AppButton, AppCard, AppChip, AppIcon, AppKeyValueTable, AppStack, AppTable, AppText } from '../base'
-import { MAX_ROW_TAGS } from '../../config/constants.js'
+import { useState } from 'react'
+import { AppButton, AppCard, AppChip, AppIcon, AppKeyValueTable, AppStack, AppTable, AppTabs, AppText } from '../base'
+import { INCIDENT_TAB, INCIDENT_TABS, MAX_ROW_TAGS } from '../../config/constants.js'
+import { useIncidentReport } from '../../hooks/useIncidentReport.js'
 import { chipProps } from '../../utils/chips.js'
 import { countLabel, formatDateTime } from '../../utils/format.js'
 import { incidentEntities, incidentTactics } from '../../utils/incidents.js'
 import { splitVisible } from '../../utils/tickets.js'
+import IncidentReport from './IncidentReport.jsx'
 
 const CHAIN_COLUMNS = [
   { key: 'time', label: 'Cuándo', mono: true, render: (k) => formatDateTime(k.time) },
@@ -13,9 +16,12 @@ const CHAIN_COLUMNS = [
   { key: 'alert_id', label: 'Alerta', mono: true, hideBelow: 'md' },
 ]
 
-// Detalle del incidente: cabecera, ficha en tabla y la cadena de ataque en el tiempo.
+// Detalle del incidente: cabecera y dos pestañas: la ficha con la cadena de ataque, y el informe de investigación
+// (nivel 3) para N2. El padre lo monta con key=incident_id, así cada incidente empieza en la primera pestaña.
 // knownTickets: IDs que existen en la cola (solo esos se pueden abrir).
 export default function IncidentDetail({ incident: inc, knownTickets, onOpenTicket, onClose }) {
+  const [tab, setTab] = useState(INCIDENT_TAB.DETAIL)
+  const report = useIncidentReport(inc.incident_id)
   const openable = (inc.ticket_ids || []).filter((id) => knownTickets.has(id))
   const rows = [
     { key: 'period', icon: 'trace', label: 'Periodo', value: <AppText>{formatDateTime(inc.first_seen)} – {formatDateTime(inc.last_seen)}</AppText> },
@@ -40,11 +46,19 @@ export default function IncidentDetail({ incident: inc, knownTickets, onOpenTick
           <AppChip {...chipProps('severity', inc.severity)} />
           <AppChip label={countLabel(inc.alert_ids?.length || 0, 'alerta')} />
         </AppStack>
+        <AppTabs items={INCIDENT_TABS} value={tab} onChange={setTab} />
       </AppCard>
-      <AppCard><AppKeyValueTable rows={rows} label={`Ficha de ${inc.incident_id}`} /></AppCard>
-      <AppCard title={`Cadena de ataque (${countLabel(inc.kill_chain?.length || 0, 'paso')})`}>
-        <AppTable columns={CHAIN_COLUMNS} rows={inc.kill_chain || []} getRowKey={(k, i) => `${k.alert_id}-${i}`} label="Cadena de ataque" />
-      </AppCard>
+      {tab === INCIDENT_TAB.DETAIL ? (
+        <>
+          <AppCard><AppKeyValueTable rows={rows} label={`Ficha de ${inc.incident_id}`} /></AppCard>
+          <AppCard title={`Cadena de ataque (${countLabel(inc.kill_chain?.length || 0, 'paso')})`}>
+            <AppTable columns={CHAIN_COLUMNS} rows={inc.kill_chain || []} getRowKey={(k, i) => `${k.alert_id}-${i}`} label="Cadena de ataque" />
+          </AppCard>
+        </>
+      ) : (
+        <IncidentReport incidentId={inc.incident_id} report={report.report} loading={report.loading} error={report.error}
+                        generating={report.generating} onGenerate={report.generate} />
+      )}
     </AppStack>
   )
 }

@@ -25,6 +25,7 @@ function IncidentCard({ incident: inc, selected, onSelect }) {
           <AppText variant="mono">{inc.incident_id}</AppText>
           <AppChip {...chipProps('severity', inc.severity)} />
           <AppChip label={countLabel(inc.alert_ids?.length || 0, 'alerta')} />
+          {inc.x_has_report ? <AppChip label="Informe N2" icon="summary" tone="llm" title="Tiene informe de investigación" /> : null}
           {inc.x_chain ? <AppChip label={countLabel(tactics.length, 'fase')} icon="mitre" title={tactics.join(' → ')} /> : null}
         </AppStack>
         <AppText variant="caption" tone="muted" lines={CARD_SUMMARY_LINES}>{tactics.join(' → ')}</AppText>

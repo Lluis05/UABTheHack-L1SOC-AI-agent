@@ -109,6 +109,13 @@ export const DETAIL_TABS = [
   { value: DETAIL_TAB.HISTORY, label: 'Historial' },
 ]
 
+// Detalle del incidente: la ficha con la cadena de ataque y el informe de investigación (nivel 3) para N2
+export const INCIDENT_TAB = { DETAIL: 'detail', REPORT: 'report' }
+export const INCIDENT_TABS = [
+  { value: INCIDENT_TAB.DETAIL, label: 'Incidente' },
+  { value: INCIDENT_TAB.REPORT, label: 'Informe N2' },
+]
+
 // Chat del ticket con Gemini (dashboard/chat.py, docs/12_chatbot.md), en el panel lateral con forma de móvil.
 // Los máximos reales llegan de /api/config.
 export const CHAT_ROLE = { USER: 'user', MODEL: 'model', ERROR: 'error' }
