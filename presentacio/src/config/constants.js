@@ -81,6 +81,4 @@ export const LEVEL_STATES = { done: 'hecho', partial: 'parcial' }
 // Fuente: README.md, «Lo que no resolvemos».
 export const LIMITS = [
   'Sin IA, 49 de 83 alertas de ataque quedan pendientes: nunca se cierran en silencio, pero necesitan IA o persona.',
-  'Si Claude cae, Gemini gratis solo da 5 peticiones por minuto.',
-  'La correlación solo une lo que conecta un dato: genera 1 incidente falso de 13.',
 ]
