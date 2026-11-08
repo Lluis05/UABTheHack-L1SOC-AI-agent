@@ -56,7 +56,7 @@ Detalle completo y contratos entre módulos en [`docs/04_arquitectura.md`](docs/
 
 ## 📊 Resultados medidos
 
-- **Todo el dataset sin IA** (`--all --no-llm`): la política decide sola **9.548 de 10.972 tickets (87 %)**; los 1.424
+- **Todo el dataset sin IA** (`--all --no-llm`): la política decide sola **9.865 de 10.972 tickets (90 %)**; los 1.107
   restantes quedan pendientes de IA. Ninguno se cierra en silencio: los pendientes high/critical se escalan a una persona.
 - **Simulacros de la defensa** (`--live`, la IA razona cada alerta en directo, sin caché):
   - 10 alertas al azar (`--random 10`): **73 s** en total (unos 7 s por alerta en paralelo), 10/10 con IA.
@@ -149,10 +149,17 @@ python -m soc.pipeline --all --no-llm                    # todo el dataset solo 
 ```
 Salida: `output/tickets.jsonl`, `output/traces/<alert_id>.json` y `output/incidents.jsonl`.
 
-**4. Tests** (no gastan cuota del LLM):
+**4. Presentación de la defensa** (3 minutos, el pipeline paso a paso con casos reales):
+```bash
+cd presentacio && npm install && npm run build   # dist/index.html: un único fichero, se abre sin servidor ni red
+```
+Detalle en [`presentacio/README.md`](presentacio/README.md).
+
+**5. Tests** (no gastan cuota del LLM):
 ```bash
 pytest                                  # backend
 cd dashboard/web && npm test            # frontend
+cd presentacio && npm test              # lógica de la presentación
 ```
 
 ## 📁 Estructura del proyecto

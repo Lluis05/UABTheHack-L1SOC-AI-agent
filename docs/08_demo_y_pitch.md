@@ -22,6 +22,25 @@
 7. Hasta qué nivel hemos llegado y cómo lo hemos construido.
 8. **Una página para el comité de dirección de Tarvia.**
 
+## Presentación de la defensa (3 minutos)
+Web interactiva en [`presentacio/`](../presentacio/README.md) (`npm run build` → `dist/index.html`, se abre sin
+servidor ni red). Cuatro diapositivas; el peso está en la segunda:
+1. **Portada (15 s):** «La IA investiga · la política decide la severidad · la persona aprueba la contención». El
+   problema va en una sola línea, sin detenerse.
+2. **El pipeline (1 min 45 s):** se elige un caso real (minero en Jenkins, PowerShell de SCCM o factura falsa con
+   inyección) y se pulsa «Reproducir triaje». Recorre las 7 etapas con el color de quién decide: entrada, contexto,
+   inteligencia, política (regla × activo = severidad), IA + revisor, correlación y persona.
+   - **IA + revisor:** la IA propone el veredicto con evidencias citadas por `event_id`. El código elimina las
+     evidencias con un `event_id` que no existe y baja la confianza; si el caso es grave (TP high/critical) o dudoso
+     (confianza < 0,6), un segundo LLM busca errores. El revisor no cambia el veredicto: si discrepa, baja la confianza,
+     deja la pregunta abierta y el ticket no se cierra solo. Por eso el minero hace 2 llamadas y SCCM solo 1.
+   - Frase para el jurado: *«Una IA propone, el código comprueba que las pruebas existen y, en lo grave, una segunda IA
+     busca errores. Si discrepan, decide una persona.»*
+3. **Resultados (40 s):** cifras medidas y niveles del reto.
+4. **Lo que no resolvemos (20 s)** y botón «Demo en directo» al dashboard para las 10 alertas.
+
+Las cifras de la presentación están en `presentacio/src/config/constants.js`; si se vuelven a medir, se cambian ahí.
+
 ## Guion de la demo (unos 7 minutos)
 1. **El problema (30 s):** 4.000 alertas al día, 15 min por alerta, nadie de noche. Ahora el sistema tría en segundos.
 2. **La cola (1 min):** las 11.061 alertas procesadas, con el desglose de cuántas cerró la política sola, cuántas

@@ -190,7 +190,7 @@ patrones conocidos de FP/TP por regla del SIEM y **PROMPT_INJECTION_TEXT**.
  "rationale":"Regla low × activo Crítica (WEB-ECOM01) = medium; −1 por bloqueado por el WAF ... → low.",
  "suggestion": {"verdict":"true_positive","decisive":true,"confidence":0.85,"because":["WAF_BLOCKED"]}}
 ```
-- `suggestion.decisive = true` → la política tiene una explicación inequívoca y nada en contra. Así se decide el **87 %** del
+- `suggestion.decisive = true` → la política tiene una explicación inequívoca y nada en contra. Así se decide el **90 %** del
   dataset. En modo en vivo el LLM la recibe como *hint* y puede discrepar.
 - `compute_severity(rule_sev, max_crit, plus, minus, authorized, criticality_source, false_positive)`: ajuste total ±1.
   Si es autorizado → informational/low; si es FP → informational.
