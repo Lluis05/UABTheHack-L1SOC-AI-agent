@@ -137,3 +137,15 @@ def test_dashboard_triage_defaults_to_batch_mode(monkeypatch, tmp_path):
     monkeypatch.setattr(agent, "cached_complete", lambda *a, **k: (_ for _ in ()).throw(AssertionError("IA llamada")))
     tickets = p.triage_live(ids=["ALR-20261005-000301"])           # SCCM: la política lo cierra sola
     assert len(tickets) == 1 and tickets[0]["x_mode"] == "policy"
+
+
+def test_dashboard_never_reuses_llm_cache(monkeypatch, tmp_path):
+    """La demo en directo no puede salir de la caché del LLM, tampoco en modo normal."""
+    import soc.pipeline as p
+    from soc import config
+
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path)
+    seen = {}
+    monkeypatch.setattr(p, "run", lambda sel, **kw: seen.update(kw) or [])
+    p.triage_live(ids=["ALR-20261005-000301"], mode="normal")
+    assert seen["use_cache"] is False

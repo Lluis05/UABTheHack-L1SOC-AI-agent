@@ -449,6 +449,9 @@ def _run_llm(groups: list[list[dict]], hints: dict, workers: int, use_cache: boo
 # Modo del triaje que lanza el dashboard. Por decisión del equipo es "normal" (lotes: la política cierra lo
 # inequívoco y la IA solo ve lo ambiguo), también en la demo. TRIAGE_MODE=live vuelve a pasar todo por la IA.
 DASHBOARD_TRIAGE_MODE = os.getenv("TRIAGE_MODE", "normal")
+# En el dashboard nunca se reutilizan respuestas del LLM, sea cual sea el modo: el jurado debe ver a la IA razonar
+# cada alerta en directo (la caché solo tiene sentido en los lotes de la CLI). DASHBOARD_LLM_CACHE=1 la reactiva.
+DASHBOARD_LLM_CACHE = os.getenv("DASHBOARD_LLM_CACHE", "0") == "1"
 
 
 def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, random: int = 0,
@@ -468,7 +471,8 @@ def triage_live(alerts: list[dict] | None = None, ids: list[str] | None = None, 
     if random:
         sel += select_alerts(store, random_n=random, api=api)
     # Los incidentes nuevos del lote se guardan siempre: el dashboard los lee de output/incidents.jsonl
-    tickets = run(sel, mode=mode, workers=workers, store=store, on_step=on_step, api=api, save_incidents_file=True)
+    tickets = run(sel, mode=mode, workers=workers, store=store, on_step=on_step, api=api, save_incidents_file=True,
+                  use_cache=DASHBOARD_LLM_CACHE)
     _append_tickets(tickets)
     return tickets
 
