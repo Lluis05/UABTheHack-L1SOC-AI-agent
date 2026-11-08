@@ -47,6 +47,26 @@ Añadid aquí todo lo que descubráis. Formato: **fecha/hora, autor y hallazgo**
 - En EDR, el usuario viene como `TARVIA\usuario` o `NT AUTHORITY\SYSTEM`. `store.user()` ya acepta el formato `DOMINIO\usuario`.
 - Carga: 6,8 s desde los ficheros y 5 s desde la caché, con unos **1,7 GB de RAM**. Ojo si en el mismo portátil corren también la API simulada y el dashboard.
 
+## Política contra los documentos de Deloitte (Lluis, 8/11 00:30)
+Revisión de tickets reales contra `politica_soc.md`, RB-01/03/05/09 y el PowerPoint. Corregido en `soc/policy`:
+- **RB-01 clics:** `EMAIL_CLICKED` contaba TODOS los clics del usuario (newsletters, intranet): 430 alertas con un
+  "clic" falso. Ahora solo los clics en este correo o su campaña (message_id, URL, host de sus enlaces o dominio
+  remitente) de **cualquier destinatario**. En Packaging Iberia quien reporta no clicó, pero lucia.castro,
+  cristina.romero y beatriz.ortega sí (portal falso) → medium y vigilar esas cuentas. El clic de paula.ramos en el
+  proveedor LEGÍTIMO `packaging-iberia.example` no cuenta. `micr0soft-365-billing`: 0 clics en todo el mes.
+- **RB-01 alcance y acciones:** `EMAIL_MASS_DELIVERY` (≥ 10 buzones del remitente en ±24 h, criterio propio:
+  RB-01 no da umbral). Acciones: `purge_email` + `block_ioc` del remitente; cerrar solo sin clic ni envío masivo.
+- **RB-05 paso 1:** `VULNERABLE_PATH_*` cruza la ruta atacada con `vulnerabilidades.csv`. Hay una abierta:
+  **VLN-2026-0412, WEB-ECOM03, `/wp-content/plugins/pagebuilder-lite/ajax/upload.php` (CVSS 8.8)**. Ninguna alerta
+  del dataset la ataca: posible trampa para la defensa. Bloqueada → no se cierra sola; si pasa el WAF → TP +1.
+- **§2 «−1 … y no hay actividad posterior»:** se verifica en el canal del ataque (mismas fuentes que sus eventos)
+  y para ficheros, si se ejecutan después en el mismo equipo. También el −1 que propone la IA. 3.795 tickets lo
+  muestran «verificado»; ninguno se anula en el dataset.
+- **Trampas de datos encontradas:** el dataset usa `198.18.0.0/15` para Internet y Python lo considera privado
+  (usar redes RFC 1918). Varias IPs de «escáner de Internet» de la GeoIP coinciden con la conexión de casa de
+  empleados (logins desde ES con su operador): no son actividad del atacante.
+- Métricas contra etiquetas: sin cambios (64,5 % veredicto estricto, 0 falsas alarmas, sin IA).
+
 ## Patrones de falsos positivos o benignos
 - (Lluis 14:00) Lo que la política decide sola, con justificación (87 % de las 11.061 alertas): SCCM (1.349), viaje imposible con móvil corporativo conocido y conforme (899), WAF bloqueado (3.386 TP de severidad baja), newsletters con SPF/DKIM/DMARC correctos (≈1.650), app de negocio firmada desde Excel (531), subdominios de CDN (473), Vela con el cliente corrigiéndose (316), AV en cuarentena (411), pentest (20), Nessus (19), OT desde ENG-WS01 (9: regla mal afinada).
 - UC-EDR-002: padre `CcmExec.exe`, usuario SYSTEM, `decoded_preview` con inventario (`Win32_Product` … `C:\Windows\CCM\Inventory`), que encaja con CHG-2026-1031.

@@ -168,3 +168,150 @@ def test_approvals():
     assert approval_for("isolate_host", "PLC-SORT01", s)["allowed"] is False
     srv = approval_for("isolate_host", "SQL-CRM01", s)
     assert srv["approvers"][0] == "N2" and len(srv["approvers"]) == 2
+
+
+# ------------------------------------------- RB-01, RB-05 y §2 (comparación con los documentos de Deloitte)
+def _phish_ctx():
+    s = get_store()
+    return s, build_context(s.alert("ALR-20261028-009484"), s)   # micr0soft-365-billing: TIP malicioso
+
+
+def test_phishing_counts_only_clicks_on_the_reported_email():
+    """mireia.lopez hizo clics ese día, pero en otros correos (intranet, proveedores): no es interacción."""
+    s, ctx = _phish_ctx()
+    names = {h["rule"] for h in ctx["policy_hits"]}
+    assert "EMAIL_CLICKED" not in names and "EMAIL_NO_INTERACTION" in names
+    assert ctx["severity"]["final"] == "low"
+
+
+def test_phishing_real_click_is_medium_and_watches_the_account():
+    from soc.policy import evaluate_policy
+    from soc.triage.prefilter import prefilter
+
+    s, ctx = _phish_ctx()
+    user = next(iter(ctx["entity_activity"]))
+    ctx["entity_activity"][user].setdefault("email_clicks", []).append(
+        {"event_id": "CLK-TEST", "user": user, "url": "https://micr0soft-365-billing.example/c/1a7154",
+         "message_id": ctx["alert"]["evidence"]["message_id"], "action": "allowed"})
+    ctx["policy_hits"], ctx["severity"] = evaluate_policy(ctx, s)
+    assert any(h["rule"] == "EMAIL_CLICKED" for h in ctx["policy_hits"])
+    assert ctx["severity"]["final"] == "medium"                     # RB-01: clic sin credenciales → medium
+    acts = {(a["action"], a["target"]) for a in prefilter(ctx)["recommended_actions"]}
+    assert ("monitor", user) in acts and not any(a == "close" for a, _ in acts)
+
+
+def test_phishing_actions_follow_rb01():
+    """Sin interacción: purgar + bloquear; cerrar solo si no hay entrega masiva."""
+    import soc.policy.rules as rules
+    from soc.policy import evaluate_policy
+    from soc.triage.prefilter import prefilter
+
+    s, ctx = _phish_ctx()
+    acts = [a["action"] for a in prefilter(ctx)["recommended_actions"]]
+    assert "EMAIL_MASS_DELIVERY" in {h["rule"] for h in ctx["policy_hits"]}       # ~26 buzones en ±24 h
+    assert acts[:2] == ["purge_email", "block_ioc"] and "close" not in acts and "monitor" not in acts
+    old = rules.MASS_DELIVERY_MIN_MAILBOXES
+    rules.MASS_DELIVERY_MIN_MAILBOXES = 10_000
+    try:
+        ctx["policy_hits"], ctx["severity"] = evaluate_policy(ctx, s)
+        acts = [a["action"] for a in prefilter(ctx)["recommended_actions"]]
+    finally:
+        rules.MASS_DELIVERY_MIN_MAILBOXES = old
+    assert "close" in acts and acts.count("block_ioc") == 1                     # sin duplicar el IOC del TIP
+
+
+def _waf_ctx(uri: str, action: str, status: int):
+    s = get_store()
+    ctx = build_context(s.alert("ALR-20261008-001497"), s)
+    ctx["alert"] = {**ctx["alert"], "entities": {**ctx["alert"]["entities"], "urls": [f"https://www.tarvia.example{uri}"]}}
+    ctx["entities"] = {**ctx["entities"], "urls": [f"https://www.tarvia.example{uri}"]}
+    ctx["related_events"] = [{**e, "uri": uri, "action": action, "status": status} for e in ctx["related_events"]]
+    return s, ctx
+
+
+def test_rb05_blocked_attack_on_vulnerable_path_is_not_auto_closed():
+    from soc.policy import evaluate_policy
+
+    s, ctx = _waf_ctx("/wp-content/plugins/pagebuilder-lite/ajax/upload.php", "blocked", 403)
+    hits, sev = evaluate_policy(ctx, s)
+    h = next(h for h in hits if h["rule"] == "VULNERABLE_PATH_TARGETED")
+    assert "VLN-2026-0412" in h["detail"] and sev["suggestion"]["decisive"] is False
+
+
+def test_rb05_vulnerable_path_that_passed_the_waf_is_true_positive():
+    from soc.policy import evaluate_policy
+
+    s, ctx = _waf_ctx("/wp-content/plugins/pagebuilder-lite/ajax/upload.php", "allowed", 200)
+    hits, sev = evaluate_policy(ctx, s)
+    assert any(h["rule"] == "VULNERABLE_PATH_REACHED" for h in hits)
+    assert sev["suggestion"]["verdict"] == "true_positive" and sev["plus_reasons"]
+
+
+def test_rb05_other_paths_do_not_match():
+    from soc.policy import evaluate_policy
+
+    s, ctx = _waf_ctx("/wp-login.php", "blocked", 403)
+    assert not any(h["rule"].startswith("VULNERABLE_PATH") for h in evaluate_policy(ctx, s)[0])
+
+
+def test_minus_one_requires_no_later_activity():
+    """§2: −1 solo si un control lo bloqueó Y no hay actividad posterior."""
+    from soc.policy import check_minus, evaluate_policy, later_activity
+
+    s = get_store()
+    ctx = build_context(s.alert("ALR-20261025-008065"), s)       # credential stuffing con rate limit
+    assert later_activity(ctx, s) == []                            # la IP no vuelve a aparecer: verificado
+    assert check_minus(["bloqueado"], [])[0] == ["bloqueado (verificado: sin actividad posterior en 24 h)"]
+    assert check_minus(["bloqueado"], ["198.18.0.1: 1 evento(s) con efecto"])[0] == []
+    assert check_minus(["bloqueado"], None)[0] == ["bloqueado"]   # sin datos: como antes
+
+    s, ctx = _waf_ctx("/wp-login.php", "blocked", 403)
+
+    class LaterSuccess:                       # el mismo origen consigue pasar el WAF 30 min después
+        def __getattr__(self, name):
+            return getattr(s, name)
+
+        def search(self, entity, *a, **k):
+            if entity == "198.18.46.118":
+                return {"waf": [{"event_id": "WAF-LATER", "timestamp": "2026-10-08T04:40:00.000Z",
+                                 "action": "allowed", "status": 200}]}
+            return s.search(entity, *a, **k)
+
+    hits, sev = evaluate_policy(ctx, LaterSuccess())
+    assert sev["minus_reasons"] == [] and sev["final"] == "medium" and "WAF-LATER" in sev["rationale"]
+
+
+def test_av_blocked_keeps_minus_unless_the_file_runs_later():
+    """Otras alertas del mismo hash en otros equipos no son actividad posterior de este ataque."""
+    from soc.policy import later_activity
+
+    s = get_store()
+    ctx = build_context(s.alert("ALR-20261014-003759"), s)     # crack_photoshop.exe en cuarentena
+    assert later_activity(ctx, s) == [] and ctx["severity"]["final"] == "low"
+
+
+def test_llm_minus_is_checked_like_the_policy_one():
+    from soc.triage.agent import final_severity
+
+    s = get_store()
+    ctx = build_context(s.alert("ALR-20261025-008065"), s)
+    ok = final_severity(ctx, "true_positive", [], ["rate limit activado"])
+    assert ok["final"] == "high" and "verificado" in ok["minus_reasons"][0]
+    ctx["severity"]["later_activity"] = ["198.18.245.227: 3 evento(s) con efecto (ECA-X)"]
+    bad = final_severity(ctx, "true_positive", [], ["rate limit activado"])
+    assert bad["final"] == "critical" and "actividad posterior" in bad["rationale"]
+
+
+def test_phishing_campaign_clicks_by_other_recipients_count():
+    """Packaging Iberia: quien reporta no clicó, pero lucia.castro, cristina.romero y beatriz.ortega sí (portal
+    falso). El clic de paula.ramos en el proveedor LEGÍTIMO (packaging-iberia.example) no cuenta."""
+    from soc.triage.prefilter import prefilter
+
+    s = get_store()
+    ctx = build_context(s.alert("ALR-20261020-011906"), s)        # lo reporta paula.ramos
+    h = next(h for h in ctx["policy_hits"] if h["rule"] == "EMAIL_CLICKED")
+    assert {"lucia.castro@tarvia.example", "cristina.romero@tarvia.example",
+            "beatriz.ortega@tarvia.example"} <= set(h["users"]) and "paula.ramos@tarvia.example" not in h["users"]
+    hint = prefilter(ctx)
+    monitored = {a["target"] for a in (hint or {}).get("recommended_actions", []) if a["action"] == "monitor"}
+    assert hint is None or "lucia.castro@tarvia.example" in monitored

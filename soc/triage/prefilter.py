@@ -102,6 +102,34 @@ def closing_actions(hits: list[dict], actions: list[dict], host: str, rule_id: s
     return out
 
 
+def _monitor_target(vals: dict) -> str:
+    """Entidad a vigilar: el equipo, si no el usuario, si no la IP (nunca «?»)."""
+    return next((v for v in (vals["host"], vals["user"], vals["ip"]) if v and v != "?"), "entidad afectada")
+
+
+def phishing_actions(ctx: dict, hits: list[dict], vals: dict) -> list[dict]:
+    """Árbol de decisión de RB-01 para un correo malicioso confirmado (sin credenciales enviadas)."""
+    ev = (ctx.get("alert") or {}).get("evidence")
+    ev = ev if isinstance(ev, dict) else {}
+    names = {h["rule"] for h in hits}
+    sender = str(ev.get("sender") or "")
+    dom = sender.split("@", 1)[1] if "@" in sender else ""
+    mass = "EMAIL_MASS_DELIVERY" in names
+    actions = [{"action": "purge_email", "target": ev.get("message_id") or sender or "correo reportado",
+                "justification": "RB-01: purgar el correo de todos los buzones" + (" (envío masivo)" if mass else "")}]
+    if dom and not dom.endswith("tarvia.example"):
+        actions.append({"action": "block_ioc", "target": dom, "justification": "RB-01: bloquear el remitente"})
+    clicked = next((h for h in hits if h["rule"] == "EMAIL_CLICKED"), None)
+    if clicked:
+        for u in clicked.get("users") or [vals["user"] if vals["user"] != "?" else _monitor_target(vals)]:
+            actions.append({"action": "monitor", "target": u,
+                            "justification": "RB-01: clic sin envío de credenciales → vigilar la cuenta 24 h"})
+    elif not mass:
+        actions.append({"action": "close", "target": "ticket",
+                        "justification": "RB-01: sin interacción y sin entrega masiva → purgar, bloquear y cerrar"})
+    return actions
+
+
 def prefilter(ctx: dict) -> dict | None:
     """Pista determinista (formato compatible con soc.triage.agent: verdict, title, summary, ...)."""
     hits = ctx.get("policy_hits") or []
@@ -144,13 +172,17 @@ def prefilter(ctx: dict) -> dict | None:
         actions = [{"action": "close", "target": "ticket", "justification": (main or {}).get("detail", "")[:200]}]
     elif final in ("high", "critical"):
         actions = [{"action": "escalate", "target": "N2", "justification": "true_positive de severidad " + final}]
-    elif final in ("informational", "low") and any(h.get("minus") for h in hits):
+    elif str(alert.get("rule_id") or "").startswith("UC-EML"):
+        actions = phishing_actions(ctx, hits, vals)
+    elif final in ("informational", "low") and sev.get("minus_reasons"):
         actions = [{"action": "close", "target": "ticket", "justification": "Bloqueado por un control, sin impacto"}]
     else:
-        actions = [{"action": "monitor", "target": vals["host"], "justification": "Vigilar 24 h la entidad afectada"}]
+        actions = [{"action": "monitor", "target": _monitor_target(vals),
+                    "justification": "Vigilar 24 h la entidad afectada"}]
     actions += closing_actions(hits, actions, vals["host"], alert.get("rule_id") or "")
     for i in ctx.get("intel") or []:
-        if sug["verdict"] == "true_positive" and (i.get("tip") or {}).get("reputation") == "malicious":
+        if sug["verdict"] == "true_positive" and (i.get("tip") or {}).get("reputation") == "malicious" \
+                and not any(a["action"] == "block_ioc" and a["target"] == i["indicator"] for a in actions):
             actions.append({"action": "block_ioc", "target": i["indicator"],
                             "justification": "Indicador malicioso en el TIP"})
 

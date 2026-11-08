@@ -547,6 +547,63 @@ def r_known_patterns(ctx, store):
     return out
 
 
+# RB-01 decide distinto «sin entrega masiva» (cerrar) y con ella, pero no fija el umbral. Criterio propio: a
+# partir de 10 buzones distintos del mismo remitente en ±24 h es una campaña (el ruido de un remitente
+# legítimo ya lo descarta LEGIT_BULK_SENDER antes).
+MASS_DELIVERY_MIN_MAILBOXES = 10
+SCOPE_WINDOW_H = 24
+
+
+def _url_host(url: str) -> str:
+    m = re.match(r"^[a-z][a-z0-9+.-]*://([^/:?#]+)", str(url or "").strip().lower())
+    return m.group(1) if m else ""
+
+
+def _phish_clicks(ctx: dict, store, mids: set[str], urls: set[str], dom: str) -> list[dict]:
+    """Clics en ESTE correo o su campaña: mismo message_id, una de sus URLs, el host de sus enlaces o el dominio
+    remitente, de cualquier destinatario (RB-01 paso 4). Los demás clics del usuario (newsletters, la intranet,
+    el proveedor legítimo al que se imita…) no son interacción con el phishing."""
+    hosts = {h for h in (_url_host(u) for u in urls) if h and not h.endswith("tarvia.example")}
+    if dom:
+        hosts.add(dom)
+    cands = [c for evs in (ctx.get("entity_activity") or {}).values() for c in evs.get("email_clicks", [])]
+    win = _scope_window(ctx)
+    if store is not None and win:
+        for h in sorted(hosts):
+            cands += store.search(h, *win, sources=["email_clicks"], limit_per_source=500).get("email_clicks", [])
+    out, seen = [], set()
+    for c in cands:
+        host = _url_host(c.get("url"))
+        if c.get("event_id") in seen:
+            continue
+        if (c.get("message_id") in mids or str(c.get("url") or "").lower() in urls
+                or any(host == h or host.endswith("." + h) for h in hosts)):
+            seen.add(c.get("event_id"))
+            out.append(c)
+    return out
+
+
+def _scope_window(ctx: dict) -> tuple[str, str] | None:
+    from datetime import timedelta, timezone
+
+    try:
+        t = datetime.fromisoformat(_ts(ctx).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+    iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%S.000Z")  # noqa: E731
+    return iso(t - timedelta(hours=SCOPE_WINDOW_H)), iso(t + timedelta(hours=SCOPE_WINDOW_H))
+
+
+def phishing_scope(ctx: dict, store, dom: str) -> set[str]:
+    """Buzones que recibieron correo del dominio remitente en ±24 h de la alerta (RB-01, paso 3: alcance)."""
+    win = _scope_window(ctx)
+    if not (store and dom and win):
+        return set()
+    found = store.search(dom, *win, sources=["email"], limit_per_source=5000)
+    return {r.lower() for e in found.get("email", []) if e.get("direction") != "outbound"
+            for r in e.get("recipients") or []}
+
+
 def _reported_phish(ctx, store):
     ev = _ev(ctx)
     sender = str(ev.get("sender") or "").lower()
@@ -554,17 +611,93 @@ def _reported_phish(ctx, store):
     emails = [e for e in ctx.get("related_events") or [] if e.get("_source") == "email"]
     auth_ok = any(all(str(e.get(k, "")).lower() == "pass" for k in ("spf", "dkim", "dmarc")) for e in emails)
     volume = store.entity_count(dom) if store and dom else 0
-    clicks = [e for evs in (ctx.get("entity_activity") or {}).values() for e in evs.get("email_clicks", [])]
     if auth_ok and volume > 500:
         return [hit("LEGIT_BULK_SENDER", "benign", f"Remitente {sender}: SPF/DKIM/DMARC correctos y {volume} eventos "
                     f"de correo de ese dominio en el mes (newsletter o comunicación recurrente que el usuario "
                     "reportó por error)", "RB-01", "false_positive")]
+    out = []
     if emails and not auth_ok:
         bad = [k for k in ("spf", "dkim", "dmarc") if any(str(e.get(k, "")).lower() != "pass" for e in emails)]
-        return [hit("EMAIL_AUTH_FAIL", "suspicious", f"Autenticación de correo fallida ({', '.join(bad)}) para "
-                    f"{sender or 'remitente'}", "RB-01")] + \
-               ([hit("EMAIL_CLICKED", "suspicious", f"{len(clicks)} clics registrados relacionados", "RB-01")]
-                if clicks else [])
+        out.append(hit("EMAIL_AUTH_FAIL", "suspicious", f"Autenticación de correo fallida ({', '.join(bad)}) para "
+                       f"{sender or 'remitente'}", "RB-01"))
+    if not (emails or dom):
+        return out
+    if dom.endswith("tarvia.example"):   # remitente interno: sus clics se confundirían con los de la intranet
+        dom = ""
+    # RB-01 paso 4: interacción con ESTE correo
+    mids = {m for m in [ev.get("message_id"), *(e.get("message_id") for e in emails)] if m}
+    urls = {str(u).lower() for e in emails for u in e.get("urls") or []}
+    clicks = _phish_clicks(ctx, store, mids, urls, dom)
+    if clicks:
+        who = sorted({c.get("user") or "?" for c in clicks})
+        h = hit("EMAIL_CLICKED", "suspicious", f"{len(clicks)} clic(s) en los enlaces de este correo o su "
+                f"campaña ({', '.join(who[:4])}{'…' if len(who) > 4 else ''}; "
+                f"{', '.join(c['event_id'] for c in clicks[:3])})", "RB-01",
+                plus="clic en el enlace del correo malicioso (RB-01: medium y vigilar la cuenta 24 h)")
+        h["users"] = who                       # a quién vigilar (puede no ser quien lo reportó)
+        out.append(h)
+    else:
+        out.append(hit("EMAIL_NO_INTERACTION", "context", "Nadie hizo clic en los enlaces de este correo "
+                       "(email_clicks por message_id, URL y dominio remitente)", "RB-01"))
+    # RB-01 paso 3: alcance
+    mailboxes = phishing_scope(ctx, store, dom)
+    if len(mailboxes) >= MASS_DELIVERY_MIN_MAILBOXES:
+        out.append(hit("EMAIL_MASS_DELIVERY", "context", f"Envío masivo: {len(mailboxes)} buzones recibieron correo de "
+                       f"{dom} en ±{SCOPE_WINDOW_H} h. Purgar de todos los buzones", "RB-01"))
+    elif mailboxes:
+        out.append(hit("EMAIL_SCOPE", "context", f"Alcance: {len(mailboxes)} buzón(es) recibieron correo de {dom} "
+                       f"en ±{SCOPE_WINDOW_H} h (sin entrega masiva)", "RB-01"))
+    return out
+
+
+# ------------------------------------------------- RB-05: ruta vulnerable
+WEB_SOURCES = ("WAF",)
+_PATH_RE = re.compile(r"(/[\w\-.~%]+(?:/[\w\-.~%]+)+)")
+
+
+def _vuln_prefixes(note: str) -> list[str]:
+    """Rutas de la nota de una vulnerabilidad y el directorio del componente (p. ej. el plugin entero)."""
+    import posixpath
+
+    out = []
+    for p in _PATH_RE.findall(note or ""):
+        out.append(p.lower())
+        comp = posixpath.dirname(posixpath.dirname(p))
+        if comp.count("/") >= 3:               # /wp-content/plugins/<plugin>: no prefijos genéricos como /api
+            out.append(comp.lower() + "/")
+    return out
+
+
+def r_vulnerable_path(ctx, store):
+    """RB-05, paso 1: ¿la ruta atacada existe y es vulnerable (vulnerabilidades.csv)?"""
+    alert = ctx.get("alert") or {}
+    if not (_rule(ctx).startswith("UC-WEB") or alert.get("source_product") in WEB_SOURCES):
+        return []
+    vulns = [(a.get("hostname"), v) for a in ctx.get("assets") or [] for v in a.get("vulnerabilities") or []
+             if str(v.get("estado", "")).lower() in ("abierta", "open")]
+    if not vulns:
+        return []
+    waf = [e for e in ctx.get("related_events") or [] if e.get("_source") == "waf"]
+    paths = {str(e.get("uri") or "").split("?")[0].lower() for e in waf}
+    paths |= {re.sub(r"^[a-z]+://[^/]+", "", str(u).lower()).split("?")[0]
+              for u in (ctx.get("entities") or {}).get("urls") or []}
+    paths.discard("")
+    for host, v in vulns:
+        prefixes = _vuln_prefixes(v.get("notas", ""))
+        hit_paths = sorted(p for p in paths if any(p == x or p.startswith(x) for x in prefixes))
+        if not hit_paths:
+            continue
+        passed = [e["event_id"] for e in waf if str(e.get("action", "")).lower() != "blocked"
+                  and str(e.get("status", "")).isdigit() and 200 <= int(e["status"]) < 400]
+        what = (f"{hit_paths[0]} es la ruta de {v.get('id')} en {host} ({v.get('producto')}, CVSS "
+                f"{v.get('severidad_cvss')}, abierta)")
+        if passed:
+            return [hit("VULNERABLE_PATH_REACHED", "malicious", f"{what} y la petición pasó el WAF "
+                        f"({', '.join(passed[:3])})", "RB-05 · vulnerabilidades.csv", "true_positive",
+                        plus="ataque a una vulnerabilidad abierta que no bloqueó el WAF")]
+        return [hit("VULNERABLE_PATH_TARGETED", "suspicious", f"{what}. El WAF bloqueó esta petición, pero el "
+                    "objetivo es explotable: comprobar si otras peticiones pasaron antes de cerrar",
+                    "RB-05 · vulnerabilidades.csv")]
     return []
 
 
@@ -609,7 +742,7 @@ def _valid_ip(v: str) -> bool:
 RULES: list[Callable] = [
     r_pentest, r_nessus, r_sccm, r_psexec_deploy, r_ot, r_logisoft, r_ad_groups, r_edr_tamper, r_payroll,
     r_terraform_pipeline, r_adm_outside_jump, r_anydesk,
-    r_svc_backup, r_supply_chain, r_hr, r_intel, r_known_patterns,
+    r_svc_backup, r_supply_chain, r_hr, r_intel, r_known_patterns, r_vulnerable_path,
     r_prompt_injection,
 ]
 

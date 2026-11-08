@@ -276,13 +276,18 @@ def final_severity(ctx: dict, verdict: str, plus: list[str], minus: list[str]) -
         crit, src = pol["max_criticality"], pol.get("criticality_source", "")
     else:
         crit, src, _ = max_criticality(ctx)
+    from soc.policy import check_minus
+
     llm_plus = [f"(IA) {r}" for r in plus] if verdict == "true_positive" else []
-    llm_minus = [f"(IA) {r}" for r in minus]
+    # El −1 del LLM pasa por la misma condición de §2 que el de la política: sin actividad posterior
+    llm_minus, note = check_minus([f"(IA) {r}" for r in minus], pol.get("later_activity"))
     all_plus = list(dict.fromkeys(list(pol.get("plus_reasons") or []) + llm_plus))
     all_minus = [] if all_plus else list(dict.fromkeys(list(pol.get("minus_reasons") or []) + llm_minus))
     sev = compute_severity(pol.get("rule_severity") or alert.get("severity"), crit, all_plus, all_minus,
                            authorized=verdict == "benign_true_positive",
                            false_positive=verdict == "false_positive", criticality_source=src)
+    for n in dict.fromkeys(x for x in (pol.get("minus_note"), note) if x):   # −1 anulados (política o IA)
+        sev["rationale"] = sev["rationale"].rstrip(".") + f"; {n}."
     sev["policy_final"] = pol.get("final")          # lo que habría dicho la política sola
     sev["llm_proposed"] = {"plus": plus, "minus": minus}
     return sev

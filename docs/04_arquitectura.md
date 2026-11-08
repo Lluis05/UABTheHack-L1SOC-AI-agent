@@ -286,10 +286,10 @@ tickets que no son FP/benignos:
    si no existe, `[]` y aviso). Añade a la traza un paso `correlate` (fuente "Correlación").
 2. `correlate_batch()` → `correlate()` sobre las alertas del **propio lote** que no se unieron a nada. Es lo que hace
    útil la correlación con el JSON nuevo de la defensa, cuyas alertas no están en nuestros incidentes. Los
-   incidentes nuevos llevan `x_live: true`, siguen la numeración (`INC-00NN`) y, en modo `live`, se añaden a
-   `output/incidents.jsonl` (los ve el dashboard y los lotes siguientes se unen a ellos).
+   incidentes nuevos llevan `x_live: true`, siguen la numeración (`INC-00NN`) y, cuando tría el dashboard
+   (`triage_live`), se añaden a `output/incidents.jsonl` (los ve el dashboard y los lotes siguientes se unen a ellos).
 Parámetros nuevos de `run()`: `incidents=None` (por defecto el fichero), `correlate_new=True`,
-`save_incidents_file=None` (por defecto solo en `live`). Lotes de más de 500 alertas no se correlan aquí (usar el CLI).
+`save_incidents_file=False` (solo `triage_live` lo activa). Lotes de más de 500 alertas no se correlan aquí (usar el CLI).
 
 **Informe de nivel 3 ✅ (Persona D, `soc/correlate/investigate.py`):** `investigate(incident, store) -> report` con el
 esquema `informe_incidente.schema.json`. `incident_id`/`alert_ids` los pone el código, los `event_id` de la
